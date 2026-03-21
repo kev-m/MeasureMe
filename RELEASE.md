@@ -52,7 +52,7 @@ git add CHANGELOG.md
 git commit -m "Updating CHANGELOG for release"
 
 # 3. Move the tag forward to include the changelog commit!
-git tag -f v0.0.9
+git tag -f $version
 
 # 4. Push the branch and the new tag
 git push

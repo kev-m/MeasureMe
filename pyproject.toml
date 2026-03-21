@@ -36,13 +36,20 @@ Source = "https://github.com/kev-m/MeasureMe"
 "Bug tracker" = "https://github.com/kev-m/MeasureMe/issues"
 
 [tool.pytest.ini_options]
+minversion = "6.0"
 addopts = [
+    "-ra",
+    "-m", "not integration",
     "--import-mode=importlib",
 ]
 testpaths = [
     "tests",
 ]
 pythonpath = "src"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests (run explicitly)"
+]
 
 [tool.flit.module]
 name = "measureme"
