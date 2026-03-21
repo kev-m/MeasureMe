@@ -57,7 +57,7 @@ Once the data has been ingested, it can be queried using the MeasureMe library.
 
 ### Trivial Example
 
-*For the full, runnable script, see [`examples/basic_query.py`](examples/basic_query.py).*
+*For the full, runnable script, see [`examples/basic_query.py`](https://github.com/kev-m/MeasureMe/blob/development/examples/basic_query.py).*
 
 ```python
 from measureme.database import get_engine, get_session_maker
@@ -84,7 +84,7 @@ with Session() as session:
 pip install matplotlib numpy PyQt6
 ```
 
-*For the full, runnable script, see [`examples/plot_calmness.py`](examples/plot_calmness.py).*
+*For the full, runnable script, see [`examples/plot_calmness.py`](https://github.com/kev-m/MeasureMe/blob/development/examples/plot_calmness.py).*
 
 ```python
 import numpy as np
