@@ -1,0 +1,9 @@
+-r requirements.txt
+
+# Development and Testing
+pytest>=7.0
+
+# Optional packages for developers who want to run the examples
+numpy
+PyQt6
+matplotlib

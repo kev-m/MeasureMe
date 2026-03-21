@@ -1,0 +1,7 @@
+# Minimum requirements for MeasureMe
+SQLAlchemy>=2.0
+
+# Optional dependencies (for examples and plotting)
+# numpy
+# PyQt6
+# matplotlib
