@@ -1,6 +1,8 @@
 import argparse
 import sys
 import json
+import csv
+import zoneinfo
 from datetime import datetime, date
 
 import os
@@ -16,6 +18,64 @@ except ImportError:
     print("Please install it (e.g., pip install -e ../FitOut) to proceed.", file=sys.stderr)
     sys.exit(1)
 
+DESTINATION_TZ_MAP = {
+    "UK": "Europe/London",
+    "Italy": "Europe/Rome",
+    "Norway": "Europe/Oslo",
+    "Netherlands": "Europe/Amsterdam",
+    "Spain (France, Italy)": "Europe/Madrid",
+    "Spain (Mallorca)": "Europe/Madrid",
+    "Spain": "Europe/Madrid",
+    "Canada": "America/Toronto",
+    "France": "Europe/Paris",
+}
+
+def parse_holidays_csv(csv_path: str):
+    holidays = []
+    if not csv_path or not os.path.exists(csv_path):
+        return holidays
+    
+    try:
+        with open(csv_path, 'r', encoding='utf-8') as f:
+            sample = f.read(1024)
+            f.seek(0)
+            dialect = csv.Sniffer().sniff(sample, delimiters='\t,;')
+            reader = csv.DictReader(f, dialect=dialect)
+            for row in reader:
+                try:
+                    start_dt = datetime.strptime(row['Departure Date'].strip(), '%Y/%m/%d').date()
+                    end_dt = datetime.strptime(row['Return Date'].strip(), '%Y/%m/%d').date()
+                    dest = row['Destination'].strip()
+                    holidays.append({
+                        'start': start_dt,
+                        'end': end_dt,
+                        'destination': dest
+                    })
+                except Exception as e:
+                    print(f"Skipping holiday row {row}: {e}")
+    except Exception as e:
+        print(f"Warning: Could not parse holidays CSV: {e}")
+        
+    return holidays
+
+def get_timezone_for_date(dt_date, holidays, default_tz="Europe/London"):
+    if not dt_date:
+        return default_tz
+    for h in holidays:
+        if h['start'] <= dt_date <= h['end']:
+            return DESTINATION_TZ_MAP.get(h['destination'], default_tz)
+    return default_tz
+
+def convert_utc_to_local(utc_naive_dt, tz_name):
+    if not utc_naive_dt:
+        return None, tz_name
+    try:
+        utc_aware = utc_naive_dt.replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
+        local_aware = utc_aware.astimezone(zoneinfo.ZoneInfo(tz_name))
+        return local_aware.replace(tzinfo=None), tz_name
+    except zoneinfo.ZoneInfoNotFoundError:
+        return utc_naive_dt, tz_name
+
 def dt_from_iso(iso_str):
     if not iso_str:
         return None
@@ -26,7 +86,7 @@ def dt_from_iso(iso_str):
         # e.g., '2024-07-21T23:30:00'
         return datetime.strptime(iso_str, '%Y-%m-%dT%H:%M:%S')
 
-def process_export(path: str, db_url: str, start: date, end: date, only_types: list = None, user_id: int = 1):
+def process_export(path: str, db_url: str, start: date, end: date, only_types: list = None, user_id: int = 1, holidays_csv: str = None):
     """
     Process a FitOut directory and insert data into MeasureMe database.
     """
@@ -36,6 +96,8 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
     
     print(f"Connecting to MeasureMe DB: {db_url}")
     print(f"Reading Fitbit Takeout data from ZIP: {path} ({start} to {end}) for User ID: {user_id}")
+    
+    holidays = parse_holidays_csv(holidays_csv) if holidays_csv else []
     
     # We use ZipFileLoader since fitout can handle Google Takeout zips directly
     data_source = fo.ZipFileLoader(path)
@@ -55,8 +117,13 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                 
                 for sleep_entry in sleep_data_raw:
                     if sleep_entry.get('startTime') and sleep_entry.get('endTime'):
-                        db_start = dt_from_iso(sleep_entry['startTime'])
-                        db_end = dt_from_iso(sleep_entry['endTime'])
+                        db_start_utc = dt_from_iso(sleep_entry['startTime'])
+                        db_end_utc = dt_from_iso(sleep_entry['endTime'])
+                        
+                        tz_name = get_timezone_for_date(db_start_utc.date() if db_start_utc else None, holidays)
+                        db_start, tz_used = convert_utc_to_local(db_start_utc, tz_name)
+                        db_end, _ = convert_utc_to_local(db_end_utc, tz_name)
+                        
                         mins_awake = sleep_entry.get('minutesAwake', 0)
                         is_main_sleep = sleep_entry.get('mainSleep', True)
                         duration_s = int((db_end - db_start).total_seconds()) if db_start and db_end else 0
@@ -68,6 +135,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             start_time=db_start,
                             end_time=db_end,
                             duration_seconds=duration_s,
+                            timezone=tz_used,
                             metadata_json=json.dumps({
                                 "minutes_awake": mins_awake,
                                 "main_sleep": is_main_sleep,
@@ -87,6 +155,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         else:
                             existing.end_time = hs.end_time
                             existing.duration_seconds = hs.duration_seconds
+                            existing.timezone = hs.timezone
                             existing.metadata_json = hs.metadata_json
             except Exception as e:
                 print(f"Warning: Failed to import Sleep data: {e}")
@@ -97,6 +166,9 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                 dates = getattr(importer, 'dates', [])
                 for d, val in zip(dates, values):
                     if val is not None and d is not None:
+                        # For daily metrics, it's already a date, so applying tz offset at midnight is less relevant,
+                        # but we still record the timezone context explicitly.
+                        tz_name = get_timezone_for_date(d, holidays)
                         dt = datetime.combine(d, datetime.min.time())
                         
                         existing = session.query(HealthMetric).filter_by(
@@ -112,12 +184,14 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 metric_type=metric_type,
                                 value=val,
                                 unit=unit,
-                                timestamp=dt
+                                timestamp=dt,
+                                timezone=tz_name
                             )
                             session.add(m)
                         else:
                             existing.value = val
                             existing.unit = unit
+                            existing.timezone = tz_name
             except Exception as e:
                 print(f"Warning: Failed to import {metric_type}: {e}")
 
@@ -185,12 +259,15 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                 exercise_data_raw = exercise_importer.get_raw_sessions(start, end)
                 
                 for ex in exercise_data_raw:
-                    dt_start = None
+                    dt_start_utc = None
                     try:
-                        dt_start = datetime.fromisoformat(ex.get('startTimeIso'))
+                        dt_start_utc = datetime.fromisoformat(ex.get('startTimeIso'))
                     except (ValueError, TypeError):
                         continue
                         
+                    tz_name = get_timezone_for_date(dt_start_utc.date() if dt_start_utc else None, holidays)
+                    dt_start, tz_used = convert_utc_to_local(dt_start_utc, tz_name)
+                    
                     duration_s = ex.get('duration', 0) // 1000  # Fitbit provides milliseconds
                     dt_end = dt_start + timedelta(seconds=duration_s)
                     
@@ -212,6 +289,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         start_time=dt_start,
                         end_time=dt_end,
                         duration_seconds=duration_s,
+                        timezone=tz_used,
                         metadata_json=json.dumps(metadata)
                     )
                     
@@ -226,6 +304,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     else:
                         existing.end_time = hs.end_time
                         existing.duration_seconds = hs.duration_seconds
+                        existing.timezone = hs.timezone
                         existing.metadata_json = hs.metadata_json
                         
             except AttributeError:
@@ -240,11 +319,14 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                 weight_data_raw = weight_importer.get_raw_sessions(start, end)
                 
                 for w_entry in weight_data_raw:
-                    dt = None
+                    dt_utc = None
                     try:
-                        dt = datetime.fromisoformat(w_entry.get('startTimeIso'))
+                        dt_utc = datetime.fromisoformat(w_entry.get('startTimeIso'))
                     except (ValueError, TypeError):
                         continue
+                        
+                    tz_name = get_timezone_for_date(dt_utc.date() if dt_utc else None, holidays)
+                    dt, tz_used = convert_utc_to_local(dt_utc, tz_name)
                         
                     # Insert weight
                     if w_entry.get('weight') is not None:
@@ -261,11 +343,13 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 metric_type='weight',
                                 value=w_entry.get('weight'),
                                 unit='kg', # or lbs, depending on user export format. Assuming numerical standard.
-                                timestamp=dt
+                                timestamp=dt,
+                                timezone=tz_used
                             )
                             session.add(m)
                         else:
                             existing.value = w_entry.get('weight')
+                            existing.timezone = tz_used
 
                     # Insert bmi
                     if w_entry.get('bmi') is not None:
@@ -282,11 +366,13 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 metric_type='bmi',
                                 value=w_entry.get('bmi'),
                                 unit='index',
-                                timestamp=dt
+                                timestamp=dt,
+                                timezone=tz_used
                             )
                             session.add(m)
                         else:
                             existing_bmi.value = w_entry.get('bmi')
+                            existing_bmi.timezone = tz_used
 
                     # Insert fat
                     if w_entry.get('fat') is not None:
@@ -303,11 +389,13 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 metric_type='body_fat',
                                 value=w_entry.get('fat'),
                                 unit='percent',
-                                timestamp=dt
+                                timestamp=dt,
+                                timezone=tz_used
                             )
                             session.add(m)
                         else:
                             existing_fat.value = w_entry.get('fat')
+                            existing_fat.timezone = tz_used
 
             except AttributeError:
                 print("Warning: WeightInfo not found in fitout")
@@ -329,10 +417,11 @@ if __name__ == "__main__":
     parser.add_argument('--end', type=str, required=True, help='End date YYYY-MM-DD')
     parser.add_argument('--types', nargs='+', help='Specify which health types to import (e.g. sleep exercises resting_heart_rate). Defaults to all.')
     parser.add_argument('--user-id', type=int, default=1, help='User ID to associate with the imported data. Defaults to 1.')
+    parser.add_argument('--holidays-csv', type=str, help='Path to a CSV file containing holiday dates to calculate proper timezones.')
     
     args = parser.parse_args()
     
     s_date = datetime.strptime(args.start, '%Y-%m-%d').date()
     e_date = datetime.strptime(args.end, '%Y-%m-%d').date()
     
-    process_export(args.path, args.db, s_date, e_date, args.types, args.user_id)
+    process_export(args.path, args.db, s_date, e_date, args.types, args.user_id, args.holidays_csv)
