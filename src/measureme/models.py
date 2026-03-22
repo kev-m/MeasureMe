@@ -19,6 +19,7 @@ class HealthSession(Base):
     start_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=False)
     duration_seconds = Column(Integer, nullable=False)
+    timezone = Column(String(50), nullable=True, default="Europe/London")
     metadata_json = Column(Text)  # Raw JSON string of vendor-specific attributes.
 
     def get_metadata(self) -> Dict[str, Any]:
@@ -44,6 +45,7 @@ class HealthMetric(Base):
     value = Column(Float, nullable=False)
     unit = Column(String(20), nullable=False) # e.g., 'bpm', 'count', 'percent'
     timestamp = Column(DateTime, nullable=False, index=True)
+    timezone = Column(String(50), nullable=True, default="Europe/London")
     
     __table_args__ = (
         Index('idx_health_metric_user_type_time', 'user_id', 'metric_type', 'timestamp'),
