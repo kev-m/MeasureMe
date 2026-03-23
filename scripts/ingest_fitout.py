@@ -357,7 +357,15 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     tz_used = tz_name
                         
                     # Insert weight
-                    if w_entry.get('weight') is not None:
+                    val_weight = w_entry.get('weight')
+                    if val_weight is not None:
+                        if weight_to_kgs:
+                            unit = 'kg'
+                            val_weight = round(val_weight / 2.20462262, 1)  # Convert lbs to kg, 1 decimal
+                        else:
+                            unit = 'lb'
+
+                            
                         existing = session.query(HealthMetric).filter_by(
                             user_id=user_id,
                             metric_type='weight',
@@ -369,14 +377,14 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 user_id=user_id,
                                 source_id=FITBIT_SOURCE_ID,
                                 metric_type='weight',
-                                value=w_entry.get('weight'),
-                                unit='kg', # or lbs, depending on user export format. Assuming numerical standard.
+                                value=val_weight,
+                                unit=unit,
                                 timestamp=dt,
                                 timezone=tz_used
                             )
                             session.add(m)
                         else:
-                            existing.value = w_entry.get('weight')
+                            existing.value = val_weight
                             existing.timezone = tz_used
 
                     # Insert bmi
@@ -447,10 +455,11 @@ if __name__ == "__main__":
     parser.add_argument('--user-id', type=int, default=1, help='User ID to associate with the imported data. Defaults to 1.')
     parser.add_argument('--holidays-csv', type=str, help='Path to a CSV file containing holiday dates to calculate proper timezones.')
     parser.add_argument('--timezone', type=str, default='Europe/London', help='The default IANA timezone to use (e.g. Europe/London).')
+    parser.add_argument('--weight-to-kgs', action='store_true', help='Set this flag if the TakeOut weight data was exported in pounds (lbs), to auto-convert to kg.')
     
     args = parser.parse_args()
     
     s_date = datetime.strptime(args.start, '%Y-%m-%d').date()
     e_date = datetime.strptime(args.end, '%Y-%m-%d').date()
     
-    process_export(args.path, args.db, s_date, e_date, args.types, args.user_id, args.holidays_csv)
+    process_export(args.path, args.db, s_date, e_date, args.types, args.user_id, args.holidays_csv, args.timezone, args.weight_to_kgs)
