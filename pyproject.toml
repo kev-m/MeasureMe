@@ -66,6 +66,9 @@ exclude = [
     "measureme_dev.db"
 ]
 
+[project.scripts]
+ingest_fitout = "measureme.cli.ingest_fitout:main"
+
 [tool.autopep8]
 max_line_length = 120
 aggressive = 0

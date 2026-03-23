@@ -1,6 +1,6 @@
 # MeasureMe Ingestion Scripts
 
-This directory contains utility scripts for importing historical and external data into the local MeasureMe database.
+This project contains a utility script for importing historical and external data into the local MeasureMe database.
 
 ## `ingest_fitout.py`
 
@@ -11,7 +11,7 @@ The primary tool for importing historical data exported via Google Takeout (from
 To import data from a specific date range into a local SQLite database:
 
 ```bash
-python ingest_fitout.py "path/to/takeout-2026xxxx.zip" \
+ingest-fitout "path/to/takeout-2026xxxx.zip" \
   --start 2024-01-01 \
   --end 2026-03-20 \
   --db "sqlite:///measureme.db"
@@ -55,7 +55,7 @@ Departure Date,Return Date,Destination
 **Execution Example with Holidays:**
 
 ```bash
-python ingest_fitout.py "path/to/takeout.zip" \
+ingest-fitout "path/to/takeout.zip" \
   --start 2024-10-01 \
   --end 2024-11-01 \
   --timezone "Europe/London" \

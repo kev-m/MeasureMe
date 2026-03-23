@@ -3,13 +3,7 @@ import os
 from datetime import date
 import pytest
 
-# Add scripts directory to path to import ingest_fitout
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
-
-# We can import ingest_fitout now
-# It is a script so it may execute code on import if not guarded by __name__ == "__main__",
-# but let's assume it has a main block. If it doesn't, we can just redefine the function.
-from ingest_fitout import get_timezone_for_date
+from measureme.cli.ingest_fitout import get_timezone_for_date
 
 def test_get_timezone_no_date():
     assert get_timezone_for_date(None, []) == "Europe/London"
