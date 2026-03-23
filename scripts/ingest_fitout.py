@@ -23,8 +23,6 @@ DESTINATION_TZ_MAP = {
     "Italy": "Europe/Rome",
     "Norway": "Europe/Oslo",
     "Netherlands": "Europe/Amsterdam",
-    "Spain (France, Italy)": "Europe/Madrid",
-    "Spain (Mallorca)": "Europe/Madrid",
     "Spain": "Europe/Madrid",
     "Canada": "America/Toronto",
     "France": "Europe/Paris",
@@ -63,7 +61,18 @@ def get_timezone_for_date(dt_date, holidays, default_tz="Europe/London"):
         return default_tz
     for h in holidays:
         if h['start'] <= dt_date <= h['end']:
-            return DESTINATION_TZ_MAP.get(h['destination'], default_tz)
+            dest = h['destination']
+            # Support explicit valid IANA timezones (e.g. "Asia/Tokyo")
+            try:
+                zoneinfo.ZoneInfo(dest)
+                return dest
+            except zoneinfo.ZoneInfoNotFoundError:
+                pass
+            
+            # Extract main country name before any parenthesis (e.g. "Spain (Mallorca)" -> "Spain")
+            base_dest = dest.split('(')[0].strip()
+            
+            return DESTINATION_TZ_MAP.get(base_dest, default_tz)
     return default_tz
 
 def convert_utc_to_local(utc_naive_dt, tz_name):
@@ -445,7 +454,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
             session.rollback()
             print(f"Error during database commit: {e}")
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Ingest FitOut unzipped data into MeasureMe database.")
     parser.add_argument('path', type=str, help='Path to the unzipped Google/Fitbit Export directory')
     parser.add_argument('--db', type=str, default='sqlite:///measureme_dev.db', help='SQLAlchemy Database URL')
@@ -463,3 +472,7 @@ if __name__ == "__main__":
     e_date = datetime.strptime(args.end, '%Y-%m-%d').date()
     
     process_export(args.path, args.db, s_date, e_date, args.types, args.user_id, args.holidays_csv, args.timezone, args.weight_to_kgs)
+
+if __name__ == "__main__":
+    main()
+
