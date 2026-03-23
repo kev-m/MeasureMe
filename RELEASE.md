@@ -24,9 +24,9 @@ Load the `docs/build/html/index.html`.
 
 ## Create a Tag
 
-**MeasureMe** uses semantic versioning. Update the version number in [MeasureMe/src/measureme/__init__.py](MeasureMe/src/measureme/__init__.py) according to changes since the previous tag.
+**MeasureMe** uses semantic versioning. Update the version number in [src/measureme/__init__.py](src/measureme/__init__.py) according to changes since the previous tag.
 
-**NOTE:** Ensure that the updated [MeasureMe/src/measureme/__init__.py](MeasureMe/src/measureme/__init__.py) is committed before creating the tag!
+**NOTE:** Ensure that the updated [src/measureme/__init__.py](src/measureme/__init__.py) is committed before creating the tag!
 
 Create a tag with the current version, e.g. `v0.0.9`.
 ```bash
