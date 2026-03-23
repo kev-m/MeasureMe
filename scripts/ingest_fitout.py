@@ -86,7 +86,7 @@ def dt_from_iso(iso_str):
         # e.g., '2024-07-21T23:30:00'
         return datetime.strptime(iso_str, '%Y-%m-%dT%H:%M:%S')
 
-def process_export(path: str, db_url: str, start: date, end: date, only_types: list = None, user_id: int = 1, holidays_csv: str = None):
+def process_export(path: str, db_url: str, start: date, end: date, only_types: list = None, user_id: int = 1, holidays_csv: str = None, default_tz: str = "Europe/London", weight_to_kgs: bool = False):
     """
     Process a FitOut directory and insert data into MeasureMe database.
     """
@@ -117,21 +117,32 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                 
                 for sleep_entry in sleep_data_raw:
                     if sleep_entry.get('startTime') and sleep_entry.get('endTime'):
-                        db_start_utc = dt_from_iso(sleep_entry['startTime'])
-                        db_end_utc = dt_from_iso(sleep_entry['endTime'])
+                        db_start = datetime.fromisoformat(sleep_entry['startTime'])
+                        db_end = datetime.fromisoformat(sleep_entry['endTime'])
+
+                        # Google TakeOut exports weight timestamps as Naive Local Time (disguised without a Z). 
+                        # We should NOT shift it by UTC offsets, just format it naively as-is.
+                        db_start = db_start.replace(tzinfo=None)
+                        tz_name = get_timezone_for_date(db_start.date() if db_start else None, holidays, default_tz)
+                        db_end = db_end.replace(tzinfo=None)
+                        tz_used = tz_name
                         
-                        tz_name = get_timezone_for_date(db_start_utc.date() if db_start_utc else None, holidays)
-                        db_start, tz_used = convert_utc_to_local(db_start_utc, tz_name)
-                        db_end, _ = convert_utc_to_local(db_end_utc, tz_name)
+                        # FITBIT API SEMANTICS: Sleep is assigned to the date when you wake up (the end time).
+                        # If the sleep ended on a day outside our bounds, discard it.
+                        if not (start <= db_end.date() <= end):
+                            continue
                         
                         mins_awake = sleep_entry.get('minutesAwake', 0)
                         is_main_sleep = sleep_entry.get('mainSleep', True)
                         duration_s = int((db_end - db_start).total_seconds()) if db_start and db_end else 0
+
+                        # FitBit API, all sleep is sleep_main!?
+                        sleep_type = 'sleep_main' # if is_main_sleep else 'sleep'
                         
                         hs = HealthSession(
                             user_id=user_id,
                             source_id=FITBIT_SOURCE_ID,
-                            session_type='sleep',
+                            session_type=sleep_type,
                             start_time=db_start,
                             end_time=db_end,
                             duration_seconds=duration_s,
@@ -168,7 +179,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     if val is not None and d is not None:
                         # For daily metrics, it's already a date, so applying tz offset at midnight is less relevant,
                         # but we still record the timezone context explicitly.
-                        tz_name = get_timezone_for_date(d, holidays)
+                        tz_name = get_timezone_for_date(d, holidays, default_tz)
                         dt = datetime.combine(d, datetime.min.time())
                         
                         existing = session.query(HealthMetric).filter_by(
@@ -225,18 +236,32 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                 bhr_importer = fo.BasicHeartRate(data_source)
                 # Fetch at 60s interval resolution as an example
                 bhr_importer.set_sampling_interval(60) 
-                # Provide exact datetimes
-                s_dt = datetime.combine(start, datetime.min.time())
-                e_dt = datetime.combine(end, datetime.max.time())
-                print(f"Fetching Heart Rate telemetry between {s_dt} and {e_dt} - this may take a while")
+                # Provide exact datetimes mapped dynamically from Local bounds to UTC bounds
+                s_tz = get_timezone_for_date(start, holidays, default_tz)
+                e_tz = get_timezone_for_date(end, holidays, default_tz)
                 
-                bhr_values = bhr_importer.get_data(s_dt, e_dt)
+                s_dt_local = datetime.combine(start, datetime.min.time(), tzinfo=zoneinfo.ZoneInfo(s_tz))
+                e_dt_local = datetime.combine(end, datetime.max.time(), tzinfo=zoneinfo.ZoneInfo(e_tz))
+                
+                # fitout queries Google's Takeout which is structured exactly in UTC. 
+                s_dt_utc = s_dt_local.astimezone(zoneinfo.ZoneInfo("UTC")).replace(tzinfo=None)
+                e_dt_utc = e_dt_local.astimezone(zoneinfo.ZoneInfo("UTC")).replace(tzinfo=None)
+                
+                print(f"Fetching Heart Rate telemetry between local {s_dt_local} and {e_dt_local}")
+                print(f"-> Mapped to absolute UTC bounds: {s_dt_utc} and {e_dt_utc}")
+                
+                bhr_values = bhr_importer.get_data(s_dt_utc, e_dt_utc)
                 bhr_dates = getattr(bhr_importer, 'dates', [])
                 
                 # 1 maps to generic 'heart_rate' in our theoretical telemetry types
                 HEART_RATE_METRIC_TYPE_ID = 1 
                 for t, val in zip(bhr_dates, bhr_values):
                     if val is not None and t is not None:
+                        # Google Takeout returns strictly UTC datetimes, but fitout may return them as naive datetimes.
+                        # Always coerce them to be explicitly UTC so .timestamp() computes absolute epoch correctly.
+                        if t.tzinfo is None:
+                            t = t.replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
+                        
                         hi = HealthIntraday(
                             timestamp_utc=int(t.timestamp()),
                             user_id=user_id,
@@ -265,7 +290,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     except (ValueError, TypeError):
                         continue
                         
-                    tz_name = get_timezone_for_date(dt_start_utc.date() if dt_start_utc else None, holidays)
+                    tz_name = get_timezone_for_date(dt_start_utc.date() if dt_start_utc else None, holidays, default_tz)
                     dt_start, tz_used = convert_utc_to_local(dt_start_utc, tz_name)
                     
                     duration_s = ex.get('duration', 0) // 1000  # Fitbit provides milliseconds
@@ -325,8 +350,11 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     except (ValueError, TypeError):
                         continue
                         
-                    tz_name = get_timezone_for_date(dt_utc.date() if dt_utc else None, holidays)
-                    dt, tz_used = convert_utc_to_local(dt_utc, tz_name)
+                    # Google TakeOut exports weight timestamps as Naive Local Time (disguised without a Z). 
+                    # We should NOT shift it by UTC offsets, just format it naively as-is.
+                    dt = dt_utc.replace(tzinfo=None)
+                    tz_name = get_timezone_for_date(dt.date() if dt else None, holidays, default_tz)
+                    tz_used = tz_name
                         
                     # Insert weight
                     if w_entry.get('weight') is not None:
@@ -418,6 +446,7 @@ if __name__ == "__main__":
     parser.add_argument('--types', nargs='+', help='Specify which health types to import (e.g. sleep exercises resting_heart_rate). Defaults to all.')
     parser.add_argument('--user-id', type=int, default=1, help='User ID to associate with the imported data. Defaults to 1.')
     parser.add_argument('--holidays-csv', type=str, help='Path to a CSV file containing holiday dates to calculate proper timezones.')
+    parser.add_argument('--timezone', type=str, default='Europe/London', help='The default IANA timezone to use (e.g. Europe/London).')
     
     args = parser.parse_args()
     
