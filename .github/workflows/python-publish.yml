@@ -56,11 +56,11 @@ jobs:
       # Official release
       name: pypi
       # OPTIONAL: uncomment and update to include your PyPI project URL in the deployment status:
-      url: https://pypi.org/project/healthyme/
+      url: https://pypi.org/project/measureme/
       #
       # Test release
       # name: testpypi
-      # url: https://test.pypi.org/project/healthyme/     
+      # url: https://test.pypi.org/project/measureme/     
     steps:
       - name: Retrieve release distributions
         uses: actions/download-artifact@v4
