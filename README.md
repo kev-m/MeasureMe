@@ -48,12 +48,14 @@ This directory is the `takeout_dir`.
 
 #### Ingest the Data
 
+The `ingest_fitout` is available as a callable script, and can be used directly:
 ```bash
-python scripts/ingest_fitout.py "C:/Dev/Fitbit/Google/takeout-20260320T162823Z-3-001.zip" --start 2024-01-01 --end 2026-03-20
+ingest_fitout "C:/Dev/Fitbit/Google/takeout-20260320T162823Z-3-001.zip" --start 2024-01-01 --end 2026-03-20
 ```
-
 By default, this will create and populate a local SQLite database named `measureme_dev.db` in the current directory.
 Once the data has been ingested, it can be queried using the MeasureMe library.
+
+See the [tool README](https://github.com/kev-m/MeasureMe/blob/development/README_CLI.md) for full details.
 
 ### Trivial Example
 
