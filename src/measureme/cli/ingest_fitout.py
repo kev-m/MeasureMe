@@ -196,6 +196,17 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
             try:
                 values = importer.get_data(start, end)
                 dates = getattr(importer, 'dates', [])
+                
+                # Fetch existing metrics in bulk to avoid individual N+1 selects
+                existing_metrics_dict = {
+                    m.timestamp: m for m in session.query(HealthMetric).filter(
+                        HealthMetric.user_id == user_id,
+                        HealthMetric.metric_type == metric_type,
+                        HealthMetric.timestamp >= datetime.combine(start, datetime.min.time()),
+                        HealthMetric.timestamp <= datetime.combine(end, datetime.max.time())
+                    ).all()
+                }
+                
                 for d, val in zip(dates, values):
                     if val is not None and d is not None:
                         # For daily metrics, it's already a date, so applying tz offset at midnight is less relevant,
@@ -204,11 +215,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             d, holidays, default_tz)
                         dt = datetime.combine(d, datetime.min.time())
 
-                        existing = session.query(HealthMetric).filter_by(
-                            user_id=user_id,
-                            metric_type=metric_type,
-                            timestamp=dt
-                        ).first()
+                        existing = existing_metrics_dict.get(dt)
 
                         if not existing:
                             m = HealthMetric(
@@ -221,6 +228,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 timezone=tz_name
                             )
                             session.add(m)
+                            existing_metrics_dict[dt] = m  # Track newly added to avoid duplicates if feed has them
                         else:
                             existing.value = val
                             existing.unit = unit
@@ -286,21 +294,43 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
 
                 # 1 maps to generic 'heart_rate' in our theoretical telemetry types
                 HEART_RATE_METRIC_TYPE_ID = 1
+                
+                # OPTIMIZATION: Query all existing PKs for the range first
+                min_ts = int(s_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
+                max_ts = int(e_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
+                
+                existing_pks = set(
+                    row[0] for row in session.query(HealthIntraday.timestamp_utc).filter(
+                        HealthIntraday.user_id == user_id,
+                        HealthIntraday.metric_type_id == HEART_RATE_METRIC_TYPE_ID,
+                        HealthIntraday.timestamp_utc >= min_ts,
+                        HealthIntraday.timestamp_utc <= max_ts
+                    ).all()
+                )
+                
+                new_mappings = []
                 for t, val in zip(bhr_dates, bhr_values):
                     if val is not None and t is not None:
                         # Google Takeout returns strictly UTC datetimes, but fitout may return them as naive datetimes.
                         # Always coerce them to be explicitly UTC so .timestamp() computes absolute epoch correctly.
                         if t.tzinfo is None:
                             t = t.replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
-
-                        hi = HealthIntraday(
-                            timestamp_utc=int(t.timestamp()),
-                            user_id=user_id,
-                            metric_type_id=HEART_RATE_METRIC_TYPE_ID,
-                            value=val
-                        )
-                        # Merge handles composite PK conflicts
-                        session.merge(hi)
+                        
+                        ts_val = int(t.timestamp())
+                        
+                        if ts_val not in existing_pks:
+                            new_mappings.append({
+                                'timestamp_utc': ts_val,
+                                'user_id': user_id,
+                                'metric_type_id': HEART_RATE_METRIC_TYPE_ID,
+                                'value': val
+                            })
+                            
+                if new_mappings:
+                    # bulk_insert_mappings is dramatically faster than individual add() or merge() calls 
+                    # and skips SQLAlchemy tracking overhead.
+                    session.bulk_insert_mappings(HealthIntraday, new_mappings)
+                    
             except AttributeError:
                 print("Warning: BasicHeartRate not found in fitout")
             except Exception as e:
