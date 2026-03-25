@@ -50,7 +50,7 @@ def main():
             end_date = bounds['last_record']
             
             recent_sleep = mq.get_sessions(
-                session_type='sleep_main', 
+                session_type='sleep', 
                 start_date=start_date, 
                 end_date=end_date, 
                 limit=5
