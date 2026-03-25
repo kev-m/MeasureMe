@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.0.0 (2026-03-25)
+
+#### New Features
+
+* Using start time (UTC) as global ID.
+* (database): Adding foreign key enforcement.
+* (models): Splitting HealthSession into explicit Sleep and Exercise.
+* Adding MeasureMeQuery abstraction layer with examples.
+#### Fixes
+
+* Capture breathing rate to 1 decimal point.
+* Skip naps in relaxation data query.
+* Updating query interface to support updated schema.
+* Fixing ingestor to work with updated schema.
+* Optimising with caches and batch updates to speed up large window inserts.
+
+Full set of changes: [`v0.4.0...v1.0.0`](https://github.com/kev-m/MeasureMe/compare/v0.4.0...v1.0.0)
+
 ## v0.4.0 (2026-03-23)
 
 #### New Features
