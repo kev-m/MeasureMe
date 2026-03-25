@@ -213,7 +213,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             sleep_entry['startTime'])
                         db_end = datetime.fromisoformat(sleep_entry['endTime'])
 
-                        # Google TakeOut exports weight timestamps as Naive Local Time (disguised without a Z).
+                        # Google TakeOut exports sleep timestamps as Naive Local Time (disguised without a Z).
                         # We should NOT shift it by UTC offsets, just format it naively as-is.
                         db_start = db_start.replace(tzinfo=None)
                         tz_name = get_timezone_for_date(
@@ -341,7 +341,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
             print("Importing Breathing Rate...")
             try:
                 insert_daily_metrics(fo.BreathingRate(
-                    data_source), 'breathing_rate', 'breaths/min')
+                    data_source, precision=1), 'breathing_rate', 'breaths/min')
             except AttributeError:
                 print("Warning: BreathingRate not found in fitout")
 
