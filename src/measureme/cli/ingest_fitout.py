@@ -240,6 +240,11 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         if not summary and hasattr(sleep_entry, 'get'):
                             # Fallback if fitout already flattened it
                             summary = sleep_entry
+                        
+                        # Delete levels.data and levels.shortData
+                        if 'levels' in sleep_entry:
+                            sleep_entry['levels'].pop('data', None)
+                            sleep_entry['levels'].pop('shortData', None)
 
                         hs = SleepSession(
                             global_id=time_as_id,
