@@ -1,4 +1,4 @@
-from measureme.models import HealthSession, HealthMetric, HealthIntraday
+from measureme.models import HealthMetric, HealthIntraday, SleepSession, ExerciseSession, MetricTypeFromString
 from measureme.database import get_engine, init_db, get_session_maker
 import argparse
 import sys
@@ -158,29 +158,41 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             (db_end - db_start).total_seconds()) if db_start and db_end else 0
 
                         # FitBit API, all sleep is sleep_main!?
-                        sleep_type = 'sleep_main'  # if is_main_sleep else 'sleep'
+                        sleep_type = 'sleep'
+                        
+                        log_id = str(sleep_entry.get('logId')) if sleep_entry.get('logId') else None
+                        
+                        summary = sleep_entry.get('levels', {}).get('summary', {})
+                        if not summary and hasattr(sleep_entry, 'get'):
+                            # Fallback if fitout already flattened it
+                            summary = sleep_entry
 
-                        hs = HealthSession(
+                        hs = SleepSession(
+                            global_id=log_id,
                             user_id=user_id,
                             source_id=FITBIT_SOURCE_ID,
-                            session_type=sleep_type,
                             start_time=db_start,
                             end_time=db_end,
                             duration_seconds=duration_s,
                             timezone=tz_used,
-                            metadata_json=json.dumps({
-                                "minutes_awake": mins_awake,
-                                "main_sleep": is_main_sleep,
-                                "efficiency": sleep_entry.get('efficiency'),
-                                "time_in_bed": sleep_entry.get('timeInBed')
-                            })
+                            metadata_json=json.dumps(sleep_entry),
+                            is_main_sleep=is_main_sleep,
+                            efficiency_score=sleep_entry.get('efficiency', 0),
+                            deep_sleep_seconds=summary.get('deep', {}).get('minutes', summary.get('summary_deep_mins', 0)) * 60,
+                            light_sleep_seconds=summary.get('light', {}).get('minutes', summary.get('summary_light_mins', 0)) * 60,
+                            rem_sleep_seconds=summary.get('rem', {}).get('minutes', summary.get('summary_rem_mins', 0)) * 60,
+                            awake_seconds=summary.get('wake', {}).get('minutes', summary.get('summary_wake_mins', mins_awake)) * 60,
+                            time_in_bed_seconds=sleep_entry.get('timeInBed', 0) * 60
                         )
 
-                        existing = session.query(HealthSession).filter_by(
-                            user_id=user_id,
-                            session_type='sleep',
-                            start_time=db_start
-                        ).first()
+                        if log_id:
+                            existing = session.query(SleepSession).filter_by(global_id=log_id).first()
+                        else:
+                            existing = session.query(SleepSession).filter_by(
+                                user_id=user_id,
+                                session_type='sleep',
+                                start_time=db_start
+                            ).first()
 
                         if not existing:
                             session.add(hs)
@@ -189,6 +201,13 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             existing.duration_seconds = hs.duration_seconds
                             existing.timezone = hs.timezone
                             existing.metadata_json = hs.metadata_json
+                            existing.is_main_sleep = hs.is_main_sleep
+                            existing.efficiency_score = hs.efficiency_score
+                            existing.deep_sleep_seconds = hs.deep_sleep_seconds
+                            existing.light_sleep_seconds = hs.light_sleep_seconds
+                            existing.rem_sleep_seconds = hs.rem_sleep_seconds
+                            existing.awake_seconds = hs.awake_seconds
+                            existing.time_in_bed_seconds = hs.time_in_bed_seconds
             except Exception as e:
                 print(f"Warning: Failed to import Sleep data: {e}")
 
@@ -291,18 +310,18 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
 
                 bhr_values = bhr_importer.get_data(s_dt_utc, e_dt_utc)
                 bhr_dates = getattr(bhr_importer, 'dates', [])
-
-                # 1 maps to generic 'heart_rate' in our theoretical telemetry types
-                HEART_RATE_METRIC_TYPE_ID = 1
-                
+               
                 # OPTIMIZATION: Query all existing PKs for the range first
                 min_ts = int(s_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
                 max_ts = int(e_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
+
+                # Extract heart_rate_id using the key 'heart_rate'
+                heart_rate_id = MetricTypeFromString('heart_rate')
                 
                 existing_pks = set(
                     row[0] for row in session.query(HealthIntraday.timestamp_utc).filter(
                         HealthIntraday.user_id == user_id,
-                        HealthIntraday.metric_type_id == HEART_RATE_METRIC_TYPE_ID,
+                        HealthIntraday.metric_type_id == heart_rate_id,
                         HealthIntraday.timestamp_utc >= min_ts,
                         HealthIntraday.timestamp_utc <= max_ts
                     ).all()
@@ -322,7 +341,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             new_mappings.append({
                                 'timestamp_utc': ts_val,
                                 'user_id': user_id,
-                                'metric_type_id': HEART_RATE_METRIC_TYPE_ID,
+                                'metric_type_id': heart_rate_id,
                                 'value': val
                             })
                             
@@ -375,22 +394,31 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     metadata = {k: v for k, v in metadata.items()
                                 if v is not None}
 
-                    hs = HealthSession(
+                    log_id = str(ex.get('logId')) if ex.get('logId') else None
+                    hs = ExerciseSession(
+                        global_id=log_id,
                         user_id=user_id,
                         source_id=FITBIT_SOURCE_ID,
-                        session_type='exercise',
                         start_time=dt_start,
                         end_time=dt_end,
                         duration_seconds=duration_s,
                         timezone=tz_used,
-                        metadata_json=json.dumps(metadata)
+                        metadata_json=json.dumps(ex),
+                        activity_name=ex.get('activityName', 'Unknown'),
+                        steps=ex.get('steps', 0),
+                        calories_burned=ex.get('calories', 0.0),
+                        distance_km=ex.get('distance', 0.0),
+                        average_heart_rate=ex.get('averageHeartRate', 0)
                     )
 
-                    existing = session.query(HealthSession).filter_by(
-                        user_id=user_id,
-                        session_type='exercise',
-                        start_time=dt_start
-                    ).first()
+                    if log_id:
+                        existing = session.query(ExerciseSession).filter_by(global_id=log_id).first()
+                    else:
+                        existing = session.query(ExerciseSession).filter_by(
+                            user_id=user_id,
+                            session_type='exercise',
+                            start_time=dt_start
+                        ).first()
 
                     if not existing:
                         session.add(hs)
@@ -399,6 +427,11 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         existing.duration_seconds = hs.duration_seconds
                         existing.timezone = hs.timezone
                         existing.metadata_json = hs.metadata_json
+                        existing.activity_name = hs.activity_name
+                        existing.steps = hs.steps
+                        existing.calories_burned = hs.calories_burned
+                        existing.distance_km = hs.distance_km
+                        existing.average_heart_rate = hs.average_heart_rate
 
             except AttributeError:
                 print("Warning: ExerciseInfo not found in fitout")
