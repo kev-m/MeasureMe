@@ -157,10 +157,10 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         duration_s = int(
                             (db_end - db_start).total_seconds()) if db_start and db_end else 0
 
-                        # FitBit API, all sleep is sleep_main!?
-                        sleep_type = 'sleep'
-                        
-                        log_id = str(sleep_entry.get('logId')) if sleep_entry.get('logId') else None
+                        # log_id = str(sleep_entry.get('logId')) if sleep_entry.get('logId') else None
+                        # TODO: Check the time zone!! This is probably local naive time - it should be UTC for global ID.
+                        # TODO: Check that seconds are / should be 00 ?!?
+                        time_as_id = int(db_start.timestamp())
                         
                         summary = sleep_entry.get('levels', {}).get('summary', {})
                         if not summary and hasattr(sleep_entry, 'get'):
@@ -168,7 +168,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             summary = sleep_entry
 
                         hs = SleepSession(
-                            global_id=log_id,
+                            global_id=time_as_id,
                             user_id=user_id,
                             source_id=FITBIT_SOURCE_ID,
                             start_time=db_start,
@@ -185,8 +185,8 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             time_in_bed_seconds=sleep_entry.get('timeInBed', 0) * 60
                         )
 
-                        if log_id:
-                            existing = session.query(SleepSession).filter_by(global_id=log_id).first()
+                        if time_as_id:
+                            existing = session.query(SleepSession).filter_by(global_id=time_as_id).first()
                         else:
                             existing = session.query(SleepSession).filter_by(
                                 user_id=user_id,
@@ -366,6 +366,8 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     start, end)
 
                 for ex in exercise_data_raw:
+                    # Google TakeOut exports startTimeIso timestamps as UTC Time (disguised without a Z).
+                    # We should shift it by UTC offsets
                     dt_start_utc = None
                     try:
                         dt_start_utc = datetime.fromisoformat(
@@ -382,21 +384,26 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     duration_s = ex.get('duration', 0) // 1000
                     dt_end = dt_start + timedelta(seconds=duration_s)
 
-                    metadata = {
-                        "activity_name": ex.get('activityName'),
-                        "calories": ex.get('calories'),
-                        "steps": ex.get('steps'),
-                        "average_heart_rate": ex.get('averageHeartRate'),
-                        "log_id": ex.get('logId')
-                    }
+                    # Get the unique ID of this exercise from the "originalStartTime"
+                    time_as_id = dt_start.replace(second=0)
+                    time_as_id = int(time_as_id.timestamp())
 
-                    # Remove None values from metadata
-                    metadata = {k: v for k, v in metadata.items()
-                                if v is not None}
+                    # metadata = {
+                    #     "activity_name": ex.get('activityName'),
+                    #     "calories": ex.get('calories'),
+                    #     "steps": ex.get('steps'),
+                    #     "average_heart_rate": ex.get('averageHeartRate'),
+                    #     "log_id": ex.get('logId')
+                    # }
 
-                    log_id = str(ex.get('logId')) if ex.get('logId') else None
+                    # # Remove None values from metadata
+                    # metadata = {k: v for k, v in metadata.items()
+                    #             if v is not None}
+
+                    # log_id = str(ex.get('logId')) if ex.get('logId') else None
+
                     hs = ExerciseSession(
-                        global_id=log_id,
+                        global_id=time_as_id,
                         user_id=user_id,
                         source_id=FITBIT_SOURCE_ID,
                         start_time=dt_start,
@@ -411,8 +418,8 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         average_heart_rate=ex.get('averageHeartRate', 0)
                     )
 
-                    if log_id:
-                        existing = session.query(ExerciseSession).filter_by(global_id=log_id).first()
+                    if time_as_id:
+                        existing = session.query(ExerciseSession).filter_by(global_id=time_as_id).first()
                     else:
                         existing = session.query(ExerciseSession).filter_by(
                             user_id=user_id,
