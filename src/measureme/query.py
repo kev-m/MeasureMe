@@ -210,6 +210,8 @@ class MeasureMeQuery:
         # Build combined data structure
         results = []
         for s in sleep_sessions:
+            if s.is_main_sleep != 1:
+                continue
             # According to common tracker logic, the "sleep date" usually corresponds to the end date 
             # (waking up), or the date the log covers. We'll use the end_time date to correlate with metrics.
             d_str = s.end_time.date().isoformat()
