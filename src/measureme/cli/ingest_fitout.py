@@ -126,6 +126,80 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
     types_to_run = only_types if only_types else all_types
 
     with Session() as session:
+        if 'intraday_heart_rate' in types_to_run:
+            print("Importing Intraday Heart Rate...")
+            try:
+                # Note: BasicHeartRate requires datetime bounds rather than just dates
+                bhr_importer = fo.BasicHeartRate(data_source)
+                # Fetch at 60s interval resolution as an example
+                bhr_importer.set_sampling_interval(60)
+                # Provide exact datetimes mapped dynamically from Local bounds to UTC bounds
+                s_tz = get_timezone_for_date(start, holidays, default_tz)
+                e_tz = get_timezone_for_date(end, holidays, default_tz)
+
+                s_dt_local = datetime.combine(
+                    start, datetime.min.time(), tzinfo=zoneinfo.ZoneInfo(s_tz))
+                e_dt_local = datetime.combine(
+                    end, datetime.max.time(), tzinfo=zoneinfo.ZoneInfo(e_tz))
+
+                # fitout queries Google's Takeout which is structured exactly in UTC.
+                s_dt_utc = s_dt_local.astimezone(
+                    zoneinfo.ZoneInfo("UTC")).replace(tzinfo=None)
+                e_dt_utc = e_dt_local.astimezone(
+                    zoneinfo.ZoneInfo("UTC")).replace(tzinfo=None)
+
+                print(
+                    f"Fetching Heart Rate telemetry between local {s_dt_local} and {e_dt_local}")
+                print(
+                    f"-> Mapped to absolute UTC bounds: {s_dt_utc} and {e_dt_utc}")
+
+                bhr_values = bhr_importer.get_data(s_dt_utc, e_dt_utc)
+                bhr_dates = getattr(bhr_importer, 'dates', [])
+               
+                # OPTIMIZATION: Query all existing PKs for the range first
+                min_ts = int(s_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
+                max_ts = int(e_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
+
+                # Extract heart_rate_id using the key 'heart_rate'
+                heart_rate_id = MetricTypeFromString('heart_rate')
+                
+                existing_pks = set(
+                    row[0] for row in session.query(HealthIntraday.timestamp_utc).filter(
+                        HealthIntraday.user_id == user_id,
+                        HealthIntraday.metric_type_id == heart_rate_id,
+                        HealthIntraday.timestamp_utc >= min_ts,
+                        HealthIntraday.timestamp_utc <= max_ts
+                    ).all()
+                )
+                
+                new_mappings = []
+                for t, val in zip(bhr_dates, bhr_values):
+                    if val is not None and t is not None:
+                        # Google Takeout returns strictly UTC datetimes, but fitout may return them as naive datetimes.
+                        # Always coerce them to be explicitly UTC so .timestamp() computes absolute epoch correctly.
+                        if t.tzinfo is None:
+                            t = t.replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
+                        
+                        ts_val = int(t.timestamp())
+                        
+                        if ts_val not in existing_pks:
+                            new_mappings.append({
+                                'timestamp_utc': ts_val,
+                                'user_id': user_id,
+                                'metric_type_id': heart_rate_id,
+                                'value': val
+                            })
+                            
+                if new_mappings:
+                    # bulk_insert_mappings is dramatically faster than individual add() or merge() calls 
+                    # and skips SQLAlchemy tracking overhead.
+                    session.bulk_insert_mappings(HealthIntraday, new_mappings)
+                    
+            except AttributeError:
+                print("Warning: BasicHeartRate not found in fitout")
+            except Exception as e:
+                print(f"Warning: Failed to import Intraday Heart Rate: {e}")
+
         if 'sleep' in types_to_run:
             print("Importing Sleep...")
             sleep_importer = fo.BasicSleepInfo(data_source)
@@ -280,80 +354,6 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                 print("Warning: HeartRateVariability not found in fitout")
             except Exception as e:
                 print(f"Warning: Failed to import HRV: {e}")
-
-        if 'intraday_heart_rate' in types_to_run:
-            print("Importing Intraday Heart Rate...")
-            try:
-                # Note: BasicHeartRate requires datetime bounds rather than just dates
-                bhr_importer = fo.BasicHeartRate(data_source)
-                # Fetch at 60s interval resolution as an example
-                bhr_importer.set_sampling_interval(60)
-                # Provide exact datetimes mapped dynamically from Local bounds to UTC bounds
-                s_tz = get_timezone_for_date(start, holidays, default_tz)
-                e_tz = get_timezone_for_date(end, holidays, default_tz)
-
-                s_dt_local = datetime.combine(
-                    start, datetime.min.time(), tzinfo=zoneinfo.ZoneInfo(s_tz))
-                e_dt_local = datetime.combine(
-                    end, datetime.max.time(), tzinfo=zoneinfo.ZoneInfo(e_tz))
-
-                # fitout queries Google's Takeout which is structured exactly in UTC.
-                s_dt_utc = s_dt_local.astimezone(
-                    zoneinfo.ZoneInfo("UTC")).replace(tzinfo=None)
-                e_dt_utc = e_dt_local.astimezone(
-                    zoneinfo.ZoneInfo("UTC")).replace(tzinfo=None)
-
-                print(
-                    f"Fetching Heart Rate telemetry between local {s_dt_local} and {e_dt_local}")
-                print(
-                    f"-> Mapped to absolute UTC bounds: {s_dt_utc} and {e_dt_utc}")
-
-                bhr_values = bhr_importer.get_data(s_dt_utc, e_dt_utc)
-                bhr_dates = getattr(bhr_importer, 'dates', [])
-               
-                # OPTIMIZATION: Query all existing PKs for the range first
-                min_ts = int(s_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
-                max_ts = int(e_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
-
-                # Extract heart_rate_id using the key 'heart_rate'
-                heart_rate_id = MetricTypeFromString('heart_rate')
-                
-                existing_pks = set(
-                    row[0] for row in session.query(HealthIntraday.timestamp_utc).filter(
-                        HealthIntraday.user_id == user_id,
-                        HealthIntraday.metric_type_id == heart_rate_id,
-                        HealthIntraday.timestamp_utc >= min_ts,
-                        HealthIntraday.timestamp_utc <= max_ts
-                    ).all()
-                )
-                
-                new_mappings = []
-                for t, val in zip(bhr_dates, bhr_values):
-                    if val is not None and t is not None:
-                        # Google Takeout returns strictly UTC datetimes, but fitout may return them as naive datetimes.
-                        # Always coerce them to be explicitly UTC so .timestamp() computes absolute epoch correctly.
-                        if t.tzinfo is None:
-                            t = t.replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
-                        
-                        ts_val = int(t.timestamp())
-                        
-                        if ts_val not in existing_pks:
-                            new_mappings.append({
-                                'timestamp_utc': ts_val,
-                                'user_id': user_id,
-                                'metric_type_id': heart_rate_id,
-                                'value': val
-                            })
-                            
-                if new_mappings:
-                    # bulk_insert_mappings is dramatically faster than individual add() or merge() calls 
-                    # and skips SQLAlchemy tracking overhead.
-                    session.bulk_insert_mappings(HealthIntraday, new_mappings)
-                    
-            except AttributeError:
-                print("Warning: BasicHeartRate not found in fitout")
-            except Exception as e:
-                print(f"Warning: Failed to import Intraday Heart Rate: {e}")
 
         if 'exercises' in types_to_run:
             print("Importing Exercises...")
