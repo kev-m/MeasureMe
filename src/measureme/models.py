@@ -54,8 +54,6 @@ class SleepSession(Base):
     start_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=False)
     duration_seconds = Column(Integer, nullable=False)
-    timezone = Column(String(50), nullable=True, default='Europe/London')
-    metadata_json = Column(Text)
 
     is_main_sleep = Column(Integer, nullable=True)
     efficiency_score = Column(Integer, nullable=True)
@@ -64,6 +62,9 @@ class SleepSession(Base):
     rem_sleep_seconds = Column(Integer, nullable=True)
     awake_seconds = Column(Integer, nullable=True)
     time_in_bed_seconds = Column(Integer, nullable=True)
+
+    timezone = Column(String(50), nullable=True, default='Europe/London')
+    metadata_json = Column(Text)
 
     def get_metadata(self) -> Dict[str, Any]:
         if self.metadata_json:
