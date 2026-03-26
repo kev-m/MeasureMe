@@ -1,4 +1,5 @@
 .venv
+.env
 
 *.pyc
 __pycache__/
@@ -20,3 +21,4 @@ debug/
 scratchpad/*.txt
 
 *.db
+*.ps1
