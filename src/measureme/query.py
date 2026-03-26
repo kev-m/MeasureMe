@@ -86,7 +86,7 @@ class MeasureMeQuery:
         start_date: datetime,
         end_date: datetime,
         user_id: Optional[int] = None,
-        limit: Optional[int] = None,
+        limit: Optional[int] = 100,
         order_by_desc: bool = True
     ) -> List[Any]:
         if session_type == "sleep":
@@ -117,6 +117,7 @@ class MeasureMeQuery:
         start_date: datetime,
         end_date: datetime,
         user_id: Optional[int] = None,
+        limit: Optional[int] = 100,
         order_by_desc: bool = True
     ) -> List[HealthMetric]:
         """Retrieves summary health metrics (like weight or resting HR) matching the criteria."""
@@ -133,6 +134,9 @@ class MeasureMeQuery:
         else:
             query = query.order_by(HealthMetric.timestamp.asc())
             
+        if limit is not None:
+            query = query.limit(limit)
+
         return query.all()
 
     def get_intraday_telemetry(
@@ -161,7 +165,7 @@ class MeasureMeQuery:
         start_date: datetime,
         end_date: datetime,
         user_id: Optional[int] = None,
-        limit: Optional[int] = None,
+        limit: Optional[int] = 100,
         order_by_desc: bool = True
     ) -> List[Dict[str, Any]]:
         """
