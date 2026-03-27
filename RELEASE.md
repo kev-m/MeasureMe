@@ -24,9 +24,9 @@ Load the `docs/build/html/index.html`.
 
 ## Create a Tag
 
-**MeasureMe** uses semantic versioning. Update the version number in [src/measureme/__init__.py](src/measureme/__init__.py) according to changes since the previous tag.
+**MeasureMe** uses semantic versioning. Update the version number in [measureme/src/measureme/__init__.py](measureme/src/measureme/__init__.py) according to changes since the previous tag.
 
-**NOTE:** Ensure that the updated [src/measureme/__init__.py](src/measureme/__init__.py) is committed before creating the tag!
+**NOTE:** Ensure that the updated [measureme/src/measureme/__init__.py](measureme/src/measureme/__init__.py) is committed before creating the tag!
 
 Create a tag with the current version, e.g. `v0.0.9`.
 ```bash
@@ -35,7 +35,7 @@ git tag v0.0.9
 
 *(Tip: In PowerShell, you can automatically extract and tag using the version in `__init__.py`:)*
 ```powershell
-$version = python -c "import re; match=re.search(r'__version__\s*=\s*[\'\""]v?([^\'\""]+)[\'\""]', open('src/measureme/__init__.py').read()); print('v' + match.group(1)) if match else exit(1)"
+$version = python -c "import re; match=re.search(r'__version__\s*=\s*[\'\""]v?([^\'\""]+)[\'\""]', open('measureme/src/measureme/__init__.py').read()); print('v' + match.group(1)) if match else exit(1)"
 if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
 ```
 

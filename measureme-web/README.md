@@ -17,10 +17,6 @@ To configure the application, you should create a `.env` file in the root of the
 ```env
 # Define the connection string (SQLAlchemy URI) or absolute path to the MeasureMe database.
 MEASUREME_DB=sqlite:////absolute/path/to/your/measureme.db
-
-# Optional deployment variables
-RSYNC_HOST=your_nas_hostname
-RSYNC_PATH=/share/homes/administrator/web_services
 ```
 
 *(Note: In local development, the `MEASUREME_DB` path might be defined as an absolute file path pointing to the `FitBitMe/storage` directory, or wherever the ingestion worker is storing data.)*

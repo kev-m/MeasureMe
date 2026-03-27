@@ -10,22 +10,11 @@ This repository is a monorepo that contains the live operational components of t
 3. **[FitBitMe (`/fitbitme`)](./fitbitme/README.md):** 
    The live ingestion tier. A webhook receiver and asynchronous worker that securely streams continuous, near-real-time data from Fitbit directly into your local MeasureMe database.
 
-*(Note: Offline batch analysis tools like `FitOut` are kept in separate repositories, as they do not form part of the live operational stack.)*
+A fourth tool, [`FitOut`](https://github.com/kev-m/FitOut/), used to access Google TakeOut data, is maintained separately.
 
 ## Environment Setup
 
 Throughout this repository, certain components rely on environment variables (`.env` files) to manage secrets, file paths, and deployment configurations.
-
-### Root Directory Setup
-
-A `.env` file at the root of the repository is optional but primarily used by local development scripts (e.g., PowerShell sync tools) to orchestrate deployment (for example, to a home NAS).
-
-**`.env`:**
-```env
-# Optional: Setup for rsync deployment scripts (e.g. NAS sync)
-RSYNC_HOST=your_nas_hostname
-RSYNC_PATH=/path/to/remote/deployment/directory
-```
 
 For configuration relating specifically to the Web Dashboard or the Fitbit Webhooks, please refer to the respective project READMEs:
 * Setup MeasureMe Web [Here](./measureme-web/README.md#configuration)

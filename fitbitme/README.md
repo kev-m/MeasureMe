@@ -30,10 +30,6 @@ TOKEN_FILE=/absolute/path/to/FitBitMe/storage/tokens.json
 # 3. Database Targeting
 # Points to the central MeasureMe database that the worker will push to.
 MEASUREME_DB=/absolute/path/to/MeasureMe/measureme.db
-
-# 4. Optional Setup for Remote NAS Deployment (Sync Scripts)
-RSYNC_HOST=nassy
-RSYNC_PATH=/share/homes/administrator/web_services
 ```
 
 *(For comprehensive instructions on generating `FB_CLIENT_ID` and pairing your account, refer to [`FITBIT_SETUP.md`](./FITBIT_SETUP.md).)*
@@ -46,9 +42,8 @@ Start the required services sequentially. Both the receiver and the worker need 
 pip install -r requirements.txt
 
 # Start the OAuth Token Flow / Webhook Receiver
-python src/receiver.py
+python src/web_services/main.py
 
 # In a separate terminal, start the Background Polling Worker
 python src/worker.py
 ```
-
