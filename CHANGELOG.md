@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.0 (2026-03-27)
+
+#### New Features
+
+* Add missing parameters to intraday queries.
+* Expose Intraday types as human-readable strings.
+#### Fixes
+
+* Adding limit parameter to get_daily_metrics.
+
+Full set of changes: [`v1.0.0...v1.1.0`](https://github.com/kev-m/MeasureMe/compare/v1.0.0...v1.1.0)
+
 ## v1.0.0 (2026-03-25)
 
 #### New Features
