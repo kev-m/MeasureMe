@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeasureMe Data Browser</title>
+    <!-- Add basic styling directly for simplicity -->
+    <style>
+        body { font-family: sans-serif; margin: 2rem; background-color: #f4f4f4; }
+        h1, h2, h3 { color: #333; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; background: white; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .nav { margin-bottom: 2rem; }
+        .nav a { margin-right: 1rem; text-decoration: none; color: #0066cc; }
+        .nav a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div class="nav">
+        <a href="/measureme/?user_id={{ user_id }}">Dashboard</a>
+        <a href="/measureme/relaxation?user_id={{ user_id }}" style="font-weight: bold; margin-left:1rem; color: #2e8b57;">Relaxation Data</a>
+        {% for session_type in session_types %}
+            <a href="/measureme/session/{{ session_type }}?user_id={{ user_id }}">{{ session_type|title }} Sessions</a>
+        {% endfor %}
+    </div>
+
+    <h1>MeasureMe Data Browser (User {{ user_id }})</h1>
+    
+    <h2>Workspace Overview</h2>
+    <p>Data Range: <strong>{{ bounds[0] }}</strong> to <strong>{{ bounds[1] }}</strong></p>
+
+    <!-- Date selector -->
+    <div style="margin-bottom: 2rem; padding: 1rem; background: white; border: 1px solid #ddd; display: inline-block;">
+        <h3 style="margin-top: 0;">Date Selection Filter</h3>
+        <label for="start_date">Start Date: </label>
+        <input type="date" id="start_date" value="{{ default_start }}">
+        
+        <label for="end_date" style="margin-left: 1rem;">End Date: </label>
+        <input type="date" id="end_date" value="{{ default_end }}">
+        
+        <div style="margin-top: 0.5rem; font-size: 0.85em; color: #666;">
+            (These dates will automatically apply to the links below)
+        </div>
+    </div>
+
+    <script>
+        function updateLinks() {
+            const start = document.getElementById('start_date').value;
+            const end = document.getElementById('end_date').value;
+            if (!start || !end) return;
+
+const params = `start_date=${start}&end_date=${end}`;
+
+            // Update all session and metric links
+            document.querySelectorAll('ul li a').forEach(link => {
+                const baseUrl = link.getAttribute('data-base-url') || link.getAttribute('href').split('&start_date')[0].split('?start_date')[0];
+                if (!link.hasAttribute('data-base-url')) {
+                    link.setAttribute('data-base-url', baseUrl);
+                }
+                const ch = baseUrl.includes('?') ? '&' : '?';
+                link.setAttribute('href', baseUrl + ch + params);
+            });
+            // Update top nav links too
+            document.querySelectorAll('.nav a').forEach(link => {
+                const baseUrl = link.getAttribute('data-base-url') || link.getAttribute('href').split('&start_date')[0].split('?start_date')[0];
+                if (!link.hasAttribute('data-base-url')) {
+                    link.setAttribute('data-base-url', baseUrl);
+                }
+                const ch = baseUrl.includes('?') ? '&' : '?';
+                link.setAttribute('href', baseUrl + ch + params);
+            });
+        }
+        
+        document.getElementById('start_date').addEventListener('change', updateLinks);
+        document.getElementById('end_date').addEventListener('change', updateLinks);
+        
+        // Initialize links on load
+        window.addEventListener('DOMContentLoaded', updateLinks);
+    </script>
+
+    <div style="display: flex; gap: 2rem;">
+        <div>
+            <h3>Available Sessions</h3>
+            <ul>
+                {% for stype in session_types %}
+                    <li><a href="/measureme/session/{{ stype }}?user_id={{ user_id }}">{{ stype }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div>
+            <h3>Available Metrics</h3>
+            <ul>
+                {% for mtype in metric_types %}
+                    <li><a href="/measureme/metric/{{ mtype }}?user_id={{ user_id }}">{{ mtype }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div>
+            <h3>Available Intraday</h3>
+            <ul>
+                {% for itype in intraday_types %}
+                    <li>
+                        <a href="/measureme/intraday/{{ itype.id }}?user_id={{ user_id }}" title="{{ itype.description }}">{{ itype.short_name|replace('_', ' ')|title }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+</body>
+</html>

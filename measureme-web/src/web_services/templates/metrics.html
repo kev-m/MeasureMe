@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ metric_type|title }} Metrics</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; background-color: #f4f4f4; }
+        h1 { color: #333; }
+        table { border-collapse: collapse; width: 100%; background: white; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .nav { margin-bottom: 1rem; }
+        .nav a { text-decoration: none; color: #0066cc; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/measureme/?user_id={{ user_id }}">&larr; Back to Dashboard</a>
+    </div>
+
+    <h1>{{ metric_type|title }} Metrics (User {{ user_id }})</h1>
+    
+    {% if not data %}
+        <p>No data found.</p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in data %}
+                <tr>
+                    <td>{{ m.timestamp }}</td>
+                    <td>{{ m.timestamp.date() }}</td>
+                    <td>{{ m.timestamp.time() }}</td>
+                    <td>{{ "%.1f"|format(m.value) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</body>
+</html>

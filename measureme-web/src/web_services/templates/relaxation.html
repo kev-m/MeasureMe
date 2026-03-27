@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Relaxation Stats</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; background-color: #f4f4f4; }
+        h1 { color: #333; }
+        table { border-collapse: collapse; width: 100%; background: white; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .nav { margin-bottom: 1rem; }
+        .nav a { text-decoration: none; color: #0066cc; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/measureme/?user_id={{ user_id }}">&larr; Back to Dashboard</a>
+    </div>
+
+    <h1>Relaxation Stats (User {{ user_id }})</h1>
+
+    {% if not data %}
+        <p>No data found.</p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Hours of Sleep</th>
+                    <th>% Deep Sleep</th>
+                    <th>Sleep Score</th>
+                    <th>BR (Breaths/min)</th>
+                    <th>HRV (ms)</th>
+                    <th>RHR (bpm)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data %}
+                <tr>
+                    <td>{{ row.date }}</td>
+                    <td>{{ "%.2f"|format(row.sleep_hours) if row.sleep_hours else "-" }}</td>
+                    <td>{{ "%.0f"|format(row.deep_sleep_pct * 100) if row.deep_sleep_pct else "-" }}</td>
+                    <td>{{ row.sleep_score if row.sleep_score else "-" }}</td>
+                    <td>{{ "%.1f"|format(row.br) if row.br else "-" }}</td>
+                    <td>{{ "%.0f"|format(row.hrv) if row.hrv else "-" }}</td>
+                    <td>{{ "%.0f"|format(row.rhr) if row.rhr else "-" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</body>
+</html>

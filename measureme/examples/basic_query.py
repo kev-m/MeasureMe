@@ -10,11 +10,11 @@ import os
 import sys
 
 # Ensure the measureme src directory is in the Python path
-base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, os.path.join(base_dir, 'src'))
+base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(base_dir, '..', 'src'))
 
 from measureme.database import get_engine, get_session_maker
-from measureme.models import HealthMetric, HealthSession
+from measureme.models import HealthMetric, SleepSession, ExerciseSession
 
 def main():
     """Execute basic queries against the MeasureMe database."""
@@ -31,9 +31,8 @@ def main():
     with Session() as session:
         # 1. Query the 5 most recent sleep sessions
         print("\n--- Recent Sleep Sessions ---")
-        recent_sleep = session.query(HealthSession)\
-            .filter(HealthSession.session_type == 'sleep')\
-            .order_by(HealthSession.start_time.desc())\
+        recent_sleep = session.query(SleepSession)\
+            .order_by(SleepSession.start_time.desc())\
             .limit(5).all()
             
         if not recent_sleep:
@@ -56,17 +55,15 @@ def main():
 
         # 3. Query the 5 most recent exercises
         print("\n--- Recent Exercises ---")
-        recent_exercises = session.query(HealthSession)\
-            .filter(HealthSession.session_type == 'exercise')\
-            .order_by(HealthSession.start_time.desc())\
+        recent_exercises = session.query(ExerciseSession)\
+            .order_by(ExerciseSession.start_time.desc())\
             .limit(5).all()
             
         if not recent_exercises:
             print("No exercise data found.")
         for ex in recent_exercises:
-            meta = ex.get_metadata()
-            name = meta.get('activity_name', 'Unknown')
-            cals = meta.get('calories', 'N/A')
+            name = ex.activity_name
+            cals = ex.calories_burned
             print(f"Date: {ex.start_time.date()}, Activity: '{name}', Calories: {cals} kcal, Duration: {ex.duration_seconds // 60} mins")
 
 if __name__ == "__main__":

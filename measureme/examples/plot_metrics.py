@@ -14,8 +14,8 @@ import sys
 import argparse
 
 # Ensure the measureme src directory is in the Python path
-base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, os.path.join(base_dir, 'src'))
+base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(base_dir, '..', 'src'))
 
 from measureme.database import get_engine, get_session_maker
 from measureme.models import HealthMetric

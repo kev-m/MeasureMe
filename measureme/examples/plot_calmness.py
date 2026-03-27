@@ -10,12 +10,12 @@ and plots the result.
 import os
 import sys
 import argparse
-from datetime import date, timedelta
+from datetime import timedelta
 import numpy as np
 
 # Ensure the measureme src directory is in the Python path
-base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, os.path.join(base_dir, 'src'))
+base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(base_dir, '..', 'src'))
 
 from measureme.database import get_engine, get_session_maker
 from measureme.models import HealthMetric
@@ -72,10 +72,10 @@ def main():
             return
             
         end_date = max_timestamp.date() if hasattr(max_timestamp, 'date') else max_timestamp
-        start_date = end_date - timedelta(days=120)
+        # Fetch raw data for the last 7 days
+        start_date = end_date - timedelta(days=7)
         
         print(f"Querying raw HealthMetric data from {start_date} to {end_date}...")
-        # Fetch raw data for the last 30 days
         metrics = session.query(HealthMetric).filter(
             HealthMetric.metric_type.in_(['breathing_rate', 'hrv_rmssd', 'resting_heart_rate']),
             HealthMetric.timestamp >= start_date

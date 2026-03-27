@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ type_info.short_name|replace('_', ' ')|title }} Intraday</title>
+    <style>
+        body { font-family: sans-serif; margin: 2rem; background-color: #f4f4f4; }
+        h1, h2 { color: #333; }
+        table { border-collapse: collapse; width: 100%; background: white; margin-top: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .nav { margin-bottom: 1rem; }
+        .nav a { text-decoration: none; color: #0066cc; }
+        .desc { font-style: italic; color: #666; margin-bottom: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="/measureme/?user_id={{ user_id }}">&larr; Back to Dashboard</a>
+    </div>
+
+    <h1>{{ type_info.short_name|replace('_', ' ')|title }} (User {{ user_id }})</h1>
+    {% if type_info.description %}
+        <div class="desc">{{ type_info.description }}</div>
+    {% endif %}
+
+    <h2>From: {{ start_date.strftime('%Y-%m-%d') }} to {{ end_date.strftime('%Y-%m-%d') }}</h2>
+
+    {% if not data %}
+        <p>No data found.</p>
+    {% else %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Time</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in data %}
+                <tr>
+                    <!-- <td>{{ d.timestamp_iso }}</td>-->
+                    <td>{{ d.timestamp_yyyymmdd }}</td>
+                    <td>{{ d.timestamp_hhmm }}</td>
+                    <td>{{ "%.0f"|format(d.value) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</body>
+</html>

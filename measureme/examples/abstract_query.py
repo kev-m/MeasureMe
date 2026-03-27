@@ -8,11 +8,10 @@ high-level `MeasureMeQuery` abstraction.
 
 import os
 import sys
-from datetime import datetime
 
 # Ensure the measureme src directory is in the Python path
-base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, os.path.join(base_dir, 'src'))
+base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__)))
+sys.path.insert(0, os.path.join(base_dir, '..', 'src'))
 
 from measureme.database import get_engine, get_session_maker
 from measureme.query import MeasureMeQuery
@@ -20,7 +19,7 @@ from measureme.query import MeasureMeQuery
 def main():
     """Execute generic queries against the MeasureMe database without raw SQLAlchemy."""
 
-    db_path = os.path.join(base_dir, 'measureme.db')
+    db_path = os.path.join(base_dir, 'measureme_dev.db')
     db_url = f"sqlite:///{db_path}"
 
     print(f"Connecting to MeasureMe DB: {db_url}")
@@ -44,7 +43,7 @@ def main():
         print(f"Data Bound Scope: {bounds['first_record']} TO {bounds['last_record']}")
 
         print("\n--- Safely Extracting Data ---")
-        if bounds['last_record'] and 'sleep_main' in st:
+        if bounds['last_record'] and 'sleep' in st:
             # Attempt to pull sleep for the last valid year of data in the DB
             start_date = bounds['last_record'].replace(year=bounds['last_record'].year - 1)
             end_date = bounds['last_record']
