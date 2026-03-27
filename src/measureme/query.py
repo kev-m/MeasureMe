@@ -164,7 +164,10 @@ class MeasureMeQuery:
         metric_type_id: int,
         start_timestamp_utc: int,
         end_timestamp_utc: int,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        limit: Optional[int] = 100,
+        order_by_desc: bool = True
+
     ) -> List[HealthIntraday]:
         """
         Retrieves high-frequency telemetry (like 60-second HR) matching the UTC boundaries.
@@ -177,8 +180,16 @@ class MeasureMeQuery:
             
         if user_id is not None:
             query = query.filter(HealthIntraday.user_id == user_id)
-            
-        return query.order_by(HealthIntraday.timestamp_utc.asc()).all()
+
+        if order_by_desc:
+            query = query.order_by(HealthIntraday.timestamp_utc.desc())
+        else:
+            query = query.order_by(HealthIntraday.timestamp_utc.asc())
+
+        if limit is not None:
+            query = query.limit(limit)
+
+        return query.all()
 
     def get_relaxation_data(
         self,
