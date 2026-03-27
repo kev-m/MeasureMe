@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from .models import SleepSession, ExerciseSession, HealthMetric, HealthIntraday
+from .models import SleepSession, ExerciseSession, HealthMetric, HealthIntraday, IntradayMetricType
 
 class MeasureMeQuery:
     """
@@ -35,12 +35,32 @@ class MeasureMeQuery:
             query = query.filter(HealthMetric.user_id == user_id)
         return [row[0] for row in query.all()]
 
-    def get_available_intraday_types(self, user_id: Optional[int] = None) -> List[int]:
-        """Returns a list of all distinct high-frequency intraday metric IDs available."""
-        query = self.session.query(HealthIntraday.metric_type_id).distinct()
+    def get_available_intraday_types(self, user_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Returns a list of all distinct high-frequency intraday metric types available, including id, short_name, and description."""
+        
+        # Get IDs that actually have data
+        data_query = self.session.query(HealthIntraday.metric_type_id).distinct()
         if user_id is not None:
-            query = query.filter(HealthIntraday.user_id == user_id)
-        return [row[0] for row in query.all()]
+            data_query = data_query.filter(HealthIntraday.user_id == user_id)
+        
+        active_ids = [row[0] for row in data_query.all()]
+        
+        if not active_ids:
+            return []
+            
+        # Join with IntradayMetricType to get the names
+        # Assuming the table IntradayMetricType is correctly seeded in the DB
+        metrics_query = self.session.query(IntradayMetricType).filter(IntradayMetricType.id.in_(active_ids))
+        
+        results = []
+        for m in metrics_query.all():
+            results.append({
+                "id": m.id,
+                "short_name": m.short_name,
+                "description": m.description
+            })
+            
+        return results
 
     def get_date_bounds(self, user_id: Optional[int] = None) -> Dict[str, Any]:
         """
