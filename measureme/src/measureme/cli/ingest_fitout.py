@@ -228,8 +228,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
 
                         mins_awake = sleep_entry.get('minutesAwake', 0)
                         is_main_sleep = sleep_entry.get('mainSleep', True)
-                        duration_s = int(
-                            (db_end - db_start).total_seconds()) if db_start and db_end else 0
+                        duration_s = sleep_entry.get('minutesAsleep', 0) * 60
 
                         # log_id = str(sleep_entry.get('logId')) if sleep_entry.get('logId') else None
                         # TODO: Check the time zone!! This is probably local naive time - it should be UTC for global ID.

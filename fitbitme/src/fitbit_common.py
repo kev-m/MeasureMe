@@ -52,7 +52,7 @@ class FitbitDataMapper:
 
             # If not existing, check for an existing sleep on the same day, within 2 hours
             if not existing:
-                duration_s = entry.get('duration', 0) // 1000
+                duration_s = entry.get('minutesAsleep', 0) * 60
                 # Fallback heuristic: matching duration within +/- 24 hours
                 tw_start = start_time_tz - timedelta(hours=2)
                 tw_end = start_time_tz + timedelta(hours=2)
@@ -77,7 +77,7 @@ class FitbitDataMapper:
             entry.pop('minuteData', None)
 
             # 2. Pre-calculate common values
-            duration = entry.get('duration', 0) // 1000
+            duration = entry.get('minutesAsleep', 0) * 60
             metadata = json.dumps(entry)
             
             levels_summary = entry.get('levels', {}).get('summary', {})
