@@ -111,12 +111,14 @@ class MeasureMeQuery:
     ) -> List[Any]:
         if session_type == "sleep":
             model = SleepSession
+            filter_time = SleepSession.end_time
         elif session_type == "exercise":
             model = ExerciseSession
+            filter_time = ExerciseSession.start_time
         else:
             return []
 
-        query = self.session.query(model).filter(model.start_time >= start_date).filter(model.start_time <= end_date)
+        query = self.session.query(model).filter(filter_time >= start_date).filter(filter_time <= end_date)
 
         if user_id is not None:
             query = query.filter(model.user_id == user_id)

@@ -50,7 +50,11 @@
                 {% for s in data %}
                 <tr>
                     <td>{{ s.global_id }}</td>
+                    {% if session_type == 'sleep' %}
+                    <td>{{ s.end_time.date() }}</td>
+                    {% else %}
                     <td>{{ s.start_time.date() }}</td>
+                    {% endif %}
                     <td>{{ s.start_time.time() }}</td>
                     <td>{{ s.end_time.time() }}</td>
                     <td>{{ "%.2f"|format(s.duration_seconds / 3600) }}</td>
