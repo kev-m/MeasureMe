@@ -1,8 +1,8 @@
 # Release Procedure
-The basic procedure for releasing a new version of **MeasureMe** consists of:
+The basic procedure for releasing a new version of **MeasureMe** sub-projects consists of:
 - Running the unit tests.
 - Checking the documentation
-- Create a tag and update the change log
+- Create a prefixed tag and update the change log
 - Build and Publish the project
 
 ## Check the Unit Tests
@@ -12,47 +12,40 @@ Run the unit tests from the project top level directory:
 pytest
 ```
 
-## Check the Documentation
+## Create a Prefixed Tag
 
-Build and check the documentation:
+**MeasureMe** uses an independent versioning strategy for its monorepo sub-projects. 
+Tags must be prefixed with the sub-project identifier (e.g. `core-v1.0.0` or `web-v1.2.0`).
+
+For the **core library (`measureme`)**, update the version number in `measureme/src/measureme/__init__.py`.
+
+**NOTE:** Ensure that the relevant code (e.g. `__init__.py`) is committed before creating the tag!
+
+Create a tag with the current version:
 ```bash
-cd docs
-make clean html
+git tag core-v0.0.9
 ```
 
-Load the `docs/build/html/index.html`.
-
-## Create a Tag
-
-**MeasureMe** uses semantic versioning. Update the version number in [measureme/src/measureme/__init__.py](measureme/src/measureme/__init__.py) according to changes since the previous tag.
-
-**NOTE:** Ensure that the updated [measureme/src/measureme/__init__.py](measureme/src/measureme/__init__.py) is committed before creating the tag!
-
-Create a tag with the current version, e.g. `v0.0.9`.
-```bash
-git tag v0.0.9
-```
-
-*(Tip: In PowerShell, you can automatically extract and tag using the version in `__init__.py`:)*
+*(Tip: In PowerShell, you can automatically extract and tag the core version:)*
 ```powershell
-$version = python -c "import re; match=re.search(r'__version__\s*=\s*[\'\""]v?([^\'\""]+)[\'\""]', open('measureme/src/measureme/__init__.py').read()); print('v' + match.group(1)) if match else exit(1)"
+$version = python -c "import re; match=re.search(r'__version__\s*=\s*[\'\"""]v?([^\'\"""]+)[\'\"""]', open('measureme/src/measureme/__init__.py').read()); print('core-v' + match.group(1)) if match else exit(1)"
 if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
 ```
 
 ## Update the ChangeLog
 
-**MeasureMe** uses `auto-changelog` to parse git commit messages and generate the `CHANGELOG.md`.
+**MeasureMe** uses an extended version of `auto-changelog` that supports path filtering (`--affects-path`).
 
 ```bash
-# 1. Generate the changelog (it will detect the tag you just made)
-auto-changelog --tag-prefix v
+# 1. Generate the changelog for a specific sub-project (it will track between the prefixed tags)
+auto-changelog --tag-prefix core-v --affects-path measureme/ --output measureme/CHANGELOG.md
 
 # 2. Add and commit the changelog
-git add CHANGELOG.md
-git commit -m "Updating CHANGELOG for $version release"
+git add measureme/CHANGELOG.md
+git commit -m "Updating CHANGELOG for core-v0.0.9 release"
 
 # 3. Move the tag forward to include the changelog commit!
-git tag -f $version
+git tag -f core-v0.0.9
 
 # 4. Push the branch and the new tag
 git push
@@ -61,7 +54,8 @@ git push -f --tags
 
 ## Make a GitHub Release
 
-Go to the GitHub project administration page and [publish a release](https://github.com/kev-m/MeasureMe/releases/new) using the tag created, above.
+Go to the GitHub project administration page and [publish a release](https://github.com/kev-m/MeasureMe/releases/new) using the newly pushed tag.
+Ensure the release notes match the changelog.
 
 Update the `release` branch:
 ```bash
@@ -76,16 +70,11 @@ git checkout development
 **NOTE:** This project is set up on GitHub for automatic publishing during the GitHub release process (above).
 These instructions are for legacy purposes or manual publishing.
 
-The library can be published using `flit` to build and publish the artifact.
+The core library (`measureme/`) can be published using `flit` to build and publish the artifact.
+(Flit automatically resolves the version dynamically out of `__init__.py` cleanly, ignoring the Git tag prefix).
 
-**NOTE:** Ensure that PyPI configuration is set up correctly, e.g. that servers and authentication are defined in the `~/.pypirc` file.
-
-The project details are defined in the `pyproject.toml` files. The version and description are defined in the top-level `__init__.py` file.
-
-This project uses [semantic versioning](https://semver.org/).
-
-Build and publish the library:
 ```bash
-$ flit build
-$ flit publish
+cd measureme/
+flit build
+flit publish
 ```
