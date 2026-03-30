@@ -23,7 +23,5 @@ For configuration relating specifically to the Web Dashboard or the Fitbit Webho
 ## Contributing
 Please review our [`CONTRIBUTING.md`](./CONTRIBUTING.md) to adhere to code styles, PEP 8 formatting, and the monorepo deployment workflows.
 
-
-
 ## Issues
 For issues related to this Python implementation, visit the [Issues](https://github.com/kev-m/MeasureMe/issues) page.
