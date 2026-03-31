@@ -1,17 +1,14 @@
 import time
-import sys
 import os
 import logging
 
 from dotenv import load_dotenv
 
-# We will need the MeasureMe models/database to save the logic 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../MeasureMe/src')))
-# Hack to support testing on the NAS
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../MeasureMe/src')))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from measureme import database
+from web_services.services.queue_db import get_next_job, mark_job_complete, mark_job_failed
 
 from fitbit_common import FitbitDataMapper, FitbitFetcher
+from fitbit_client import FitbitClient
 
 load_dotenv()
 
@@ -21,11 +18,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 log = logging.getLogger('FitbitWorker')
-
-from measureme import database
-from web_services.services.queue_db import get_next_job, mark_job_complete, mark_job_failed
-from fitbit_client import FitbitClient
-
 
 def get_current_timezone(timezone_path) -> str:
     """Read the current timezone set by the web config, fallback to .env or default."""
