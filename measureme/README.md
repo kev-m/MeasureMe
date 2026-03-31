@@ -119,7 +119,7 @@ calmness_index = 100 - (rhr_arr / 2. + breathing_arr * 2. - hrv_arr)
 ```
 
 ### More Examples
-For more examples, see the [examples](https://github.com/kev-m/MeasureMe/tree/development/examples) directory.
+For more examples, see the [examples](https://github.com/kev-m/MeasureMe/tree/development/measureme/examples) directory.
 
 ## Contributing
 If you'd like to contribute to **MeasureMe**, follow the guidelines outlined in the [Contributing Guide](https://github.com/kev-m/MeasureMe/blob/development/CONTRIBUTING.md).
