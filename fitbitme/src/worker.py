@@ -22,7 +22,7 @@ logging.basicConfig(
 )
 log = logging.getLogger('FitbitWorker')
 
-from measureme import models, database
+from measureme import database
 from web_services.services.queue_db import get_next_job, mark_job_complete, mark_job_failed
 from fitbit_client import FitbitClient
 
@@ -37,8 +37,9 @@ def get_current_timezone(timezone_path) -> str:
                     return tz
         except Exception as e:
             log.warning(f"Could not read timezone file: {e}")
-            
+
     return os.getenv("USER_TIMEZONE", "Europe/London")
+
 
 def process_event(event_payload, data_db_path, timezone_path):
     """
@@ -59,7 +60,7 @@ def process_event(event_payload, data_db_path, timezone_path):
     database.init_db(engine)
     Session = database.get_session_maker(engine)
     db_session = Session()
-    
+
     # Check for a user-configured timezone override, default to Europe/London
     user_tz = get_current_timezone(timezone_path)
     mapper = FitbitDataMapper(db_session, tz_name=user_tz)
@@ -70,7 +71,8 @@ def process_event(event_payload, data_db_path, timezone_path):
         for event in event_payload:
             collection_type = event.get('collectionType')
             date_str = event.get('date')  # Format usually YYYY-MM-DD
-            fetcher.fetch_and_process(collection_type, date_str, is_webhook=True)
+            fetcher.fetch_and_process(
+                collection_type, date_str, is_webhook=True)
     finally:
         db_session.close()
 
@@ -110,6 +112,7 @@ def run_worker(job_db_path, data_db_path, timezone_path):
                 log.critical(f"Critical Worker Error: {e}")
             time.sleep(2)
 
+
 if __name__ == '__main__':
     QUEUE_DB_PATH = os.environ.get('QUEUE_DB_PATH', 'storage/jobs.db')
     MEASUREME_DB = os.environ.get('MEASUREME_DB', 'storage/measureme_fb.db')
@@ -120,4 +123,5 @@ if __name__ == '__main__':
     log.info(f"Using time-zone path: '{TZ_FILE_PATH}'")
 
     print(f"Using DB path '{QUEUE_DB_PATH}'")
-    run_worker(job_db_path=QUEUE_DB_PATH, data_db_path=MEASUREME_DB, timezone_path=TZ_FILE_PATH)
+    run_worker(job_db_path=QUEUE_DB_PATH, data_db_path=MEASUREME_DB,
+               timezone_path=TZ_FILE_PATH)
