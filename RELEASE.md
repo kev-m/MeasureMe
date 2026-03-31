@@ -17,7 +17,7 @@ pytest
 **MeasureMe** uses an independent versioning strategy for its monorepo sub-projects. 
 Tags must be prefixed with the sub-project identifier (e.g. `core-v1.0.0` or `web-v1.2.0`).
 
-For the **core library (`measureme`)**, update the version number in `measureme/src/measureme/__init__.py`.
+For the **core library (`measureme`)**, update the version number in [`init.py`](measureme\src\measureme\__init__.py).
 
 **NOTE:** Ensure that the relevant code (e.g. `__init__.py`) is committed before creating the tag!
 
@@ -26,19 +26,19 @@ Create a tag with the current version:
 git tag core-v0.0.9
 ```
 
-*(Tip: In PowerShell, you can automatically extract and tag the core version:)*
+*(Tip: In PowerShell, you can automatically extract and tag the core version safely avoiding quote-escaping problems:)*
 ```powershell
-$version = python -c "import re; match=re.search(r'__version__\s*=\s*[\'\"""]v?([^\'\"""]+)[\'\"""]', open('measureme/src/measureme/__init__.py').read()); print('core-v' + match.group(1)) if match else exit(1)"
-if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
+$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme/src/measureme/__init__.py').read()); print('core-v' + match.group(1)) if match else exit(1)";
+$version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
 ```
 
 ## Update the ChangeLog
 
-**MeasureMe** uses an extended version of `auto-changelog` that supports path filtering (`--affects-path`).
+**MeasureMe** uses an extended version of `auto-changelog` that supports path filtering (`--affects-path`), combined with a custom Jinja2 template (`changelog-template.jinja2`) to automatically strip prefixes like `core-` or `web-` from the markdown headers.
 
 ```bash
 # 1. Generate the changelog for a specific sub-project (it will track between the prefixed tags)
-auto-changelog --tag-prefix core-v --affects-path measureme/ --output measureme/CHANGELOG.md
+auto-changelog --tag-prefix core-v --affects-path measureme/ --output measureme/CHANGELOG.md --template changelog-template.jinja2
 
 # 2. Add and commit the changelog
 git add measureme/CHANGELOG.md
