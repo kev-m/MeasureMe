@@ -14,16 +14,29 @@ pytest
 
 ## Create a Prefixed Tag
 
-**MeasureMe** uses an independent versioning strategy for its monorepo sub-projects. 
+**MeasureMe** uses a semi-independent versioning strategy for its monorepo sub-projects.
+
+All sub-projects share the same `major.minor` version, but support individual `major.minor.patch`
+versions to account for individual improvements.
+
 Tags must be prefixed with the sub-project identifier (e.g. `core-v1.0.0` or `web-v1.2.0`).
 
+### Core
 For the **core library (`measureme`)**, update the version number in [`init.py`](measureme\src\measureme\__init__.py).
+
+### FitBit API
+For the **FitBit API project (`fitbitme`)**, update the version number in [`init.py`](fitbitme\src\__init__.py).
+
+### MeasureMe API
+For the **MeasureMe API project (`measureme-web`)**, update the version number in [`init.py`](fitbitme\src\__init__.py).
+
 
 **NOTE:** Ensure that the relevant code (e.g. `__init__.py`) is committed before creating the tag!
 
 Create a tag with the current version:
 ```bash
-git tag core-v0.0.9
+version=core-v0.0.9
+git tag $version
 ```
 
 *(Tip: In PowerShell, you can automatically extract and tag the core version safely avoiding quote-escaping problems:)*
@@ -42,10 +55,10 @@ auto-changelog --tag-prefix core-v --affects-path measureme/ --output measureme/
 
 # 2. Add and commit the changelog
 git add measureme/CHANGELOG.md
-git commit -m "Updating CHANGELOG for core-v0.0.9 release"
+git commit -m "Updating CHANGELOG for $version release"
 
 # 3. Move the tag forward to include the changelog commit!
-git tag -f core-v0.0.9
+git tag -f $version
 
 # 4. Push the branch and the new tag
 git push
