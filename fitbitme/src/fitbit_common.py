@@ -148,7 +148,6 @@ class FitbitDataMapper:
 
             # It is safe to cast to int, as FitBit logId is a number
             log_id = int(act.get('logId')) if act.get('logId') else None
-            start_time_tz = start_time.replace(tzinfo=self.tz_info)
 
             averageHeartRate = act.get('averageHeartRate', 0)
             if averageHeartRate == 0:
@@ -165,6 +164,7 @@ class FitbitDataMapper:
             ).first()
 
             if not existing:
+                log.info("Unable to find activity with ID %s, trying fallback", log_id)
                 # Fallback heuristic: matching duration within +/- 24 hours
                 tw_start = start_time - timedelta(hours=24)
                 tw_end = start_time + timedelta(hours=24)
@@ -176,6 +176,7 @@ class FitbitDataMapper:
                 for p in potentials:
                     if abs(p.duration_seconds - duration_s) <= 5:
                         existing = p
+                        log.info("Found replacement activity of ID %s with ID %s", log_id, p.global_id)
                         break
 
             if not existing:
@@ -198,6 +199,7 @@ class FitbitDataMapper:
             else:
                 # Note: API might have a different `logId`, let's not overwrite the log_id if it matched by duration,
                 # but we could update the metadata to match the latest API response.
+                existing.start_time = start_time
                 existing.end_time = end_time
                 existing.duration_seconds = duration_s
                 existing.timezone = self.tz_name

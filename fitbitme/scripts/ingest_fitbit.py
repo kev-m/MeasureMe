@@ -8,13 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# We need the MeasureMe models/database 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../MeasureMe/src')))
 # We also need the local fitbit_client and worker logic
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
-
-# Hack to support testing on the NAS
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../MeasureMe/src')))
 
 from measureme import database
 from fitbit_common import FitbitDataMapper, FitbitFetcher
@@ -22,7 +17,8 @@ from fitbit_client import FitbitClient
 
 # Configure basic logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    # level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 log = logging.getLogger('FitbitIngest')
