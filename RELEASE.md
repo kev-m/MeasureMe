@@ -14,48 +14,52 @@ pytest
 
 ## Create a Prefixed Tag
 
-**MeasureMe** uses a semi-independent versioning strategy for its monorepo sub-projects.
-
-All sub-projects share the same `major` version, but support individual `major.minor.patch`
-versions to account for individual improvements.
+**MeasureMe** uses an independent versioning strategy for its monorepo sub-projects.
 
 Tags must be prefixed with the sub-project identifier (e.g. `core-v1.2.0`, `api-v1.2.0` or `fitbit-v1.2.0`).
 
-**NOTE:** Ensure that the relevant code (e.g. `__init__.py`) is committed before creating the tag!
+**NOTE:** Ensure that the relevant code (e.g. `__init__.py`) is committed before preparing the release! 
+Wait to create the tag until the changelog is generated and committed.
 
-Create a tag with the current version:
-```bash
-version=core-v0.0.9
-git tag $version
-```
+**NOTE:** When a major (breaking) change affects `core`, ensure you test and update downstream dependents (`fitbitme`, `measureme-web`) if they rely on the breaking changes.
 
-**NOTE:** When a major (breaking change) change affects *any* component, be sure to update *all* components to the next major version.
-
-Tag the changed component(s), as per the instructions.
+Prepare the release for the changed component(s), as per the instructions.
 
 ### Core
 For the **core library (`measureme`)**, update the version number in [`init.py`](measureme/src/measureme/__init__.py).
 
-*(Tip: In PowerShell, you can automatically extract and tag the core version safely avoiding quote-escaping problems:)*
+*(Tip: In PowerShell, you can automatically extract the target version safely avoiding quote-escaping problems:)*
 ```powershell
 $code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme/src/measureme/__init__.py').read()); print('core-v' + match.group(1)) if match else exit(1)";
-$version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
+$version = python -c $code; if ($LASTEXITCODE -eq 0) { Write-Host "Target Version: $version" } else { Write-Host "Failed to find version" }
 ```
+
+```powershell
+$loc = "measureme"
+$comp = "core-v"
+$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme/src/measureme/__init__.py').read()); print('$comp' + match.group(1)) if match else exit(1)";
+$version = python -c $code; if ($LASTEXITCODE -eq 0) { Write-Host "Target Version: $version" } else { Write-Host "Failed to find version" }
+```
+
 
 ### FitBit API
 For the **FitBit API project (`fitbitme`)**, update the version number in [`init.py`](fitbitme/src/__init__.py).
 
 ```powershell
-$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('fitbitme/src/__init__.py').read()); print('fitbit-v' + match.group(1)) if match else exit(1)";
-$version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
+$loc = "fitbitme"
+$comp = "fitbit-v"
+$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('fitbitme/src/__init__.py').read()); print('$comp' + match.group(1)) if match else exit(1)";
+$version = python -c $code; if ($LASTEXITCODE -eq 0) { Write-Host "Target Version: $version" } else { Write-Host "Failed to find version" }
 ```
 
 ### MeasureMe API
 For the **MeasureMe API project (`measureme-web`)**, update the version number in [`init.py`](measureme-web/src/__init__.py).
 
 ```powershell
-$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme-web/src/__init__.py').read()); print('api-v' + match.group(1)) if match else exit(1)";
-$version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
+$loc = "measureme-web"
+$comp = "api-v"
+$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme-web/src/__init__.py').read()); print('$comp' + match.group(1)) if match else exit(1)";
+$version = python -c $code; if ($LASTEXITCODE -eq 0) { Write-Host "Target Version: $version" } else { Write-Host "Failed to find version" }
 ```
 
 ## Update the ChangeLog
@@ -63,19 +67,19 @@ $version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-H
 **MeasureMe** uses an extended version of `auto-changelog` that supports path filtering (`--affects-path`), combined with a custom Jinja2 template (`changelog-template.jinja2`) to automatically strip prefixes like `core-` or `web-` from the markdown headers.
 
 ```bash
-# 1. Generate the changelog for a specific sub-project (it will track between the prefixed tags)
-auto-changelog --tag-prefix core-v --affects-path measureme/ --output measureme/CHANGELOG.md --template changelog-template.jinja2
+# 1. Generate the changelog, specifying the new version explicitly so unreleased changes are grouped under it
+auto-changelog --tag-prefix $comp --affects-path $loc/ --output $loc/CHANGELOG.md --template changelog-template.jinja2 --latest-version $version
 
-# 2. Add and commit the changelog
-git add measureme/CHANGELOG.md
-git commit -m "Updating CHANGELOG for $version release"
+# 2. Add and commit the version bump and the changelog together
+git add $loc
+git commit -m "Bump version to $version and update changelog"
 
-# 3. Move the tag forward to include the changelog commit!
-git tag -f $version
+# 3. Create the tag on this final commit
+git tag $version
 
 # 4. Push the branch and the new tag
-git push
-git push -f --tags
+git push origin development
+git push origin $version
 ```
 
 ## Make a GitHub Release
@@ -83,11 +87,11 @@ git push -f --tags
 Go to the GitHub project administration page and [publish a release](https://github.com/kev-m/MeasureMe/releases/new) using the newly pushed tag.
 Ensure the release notes match the changelog.
 
-Update the `release` branch:
+Update the `release` branch using a fast-forward merge (safely preserves matching commit hashes):
 ```bash
 git checkout release
-git rebase development
-git push -f
+git merge --ff-only development
+git push origin release
 git checkout development
 ```
 
