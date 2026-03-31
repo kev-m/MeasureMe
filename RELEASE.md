@@ -19,17 +19,7 @@ pytest
 All sub-projects share the same `major.minor` version, but support individual `major.minor.patch`
 versions to account for individual improvements.
 
-Tags must be prefixed with the sub-project identifier (e.g. `core-v1.0.0` or `web-v1.2.0`).
-
-### Core
-For the **core library (`measureme`)**, update the version number in [`init.py`](measureme\src\measureme\__init__.py).
-
-### FitBit API
-For the **FitBit API project (`fitbitme`)**, update the version number in [`init.py`](fitbitme\src\__init__.py).
-
-### MeasureMe API
-For the **MeasureMe API project (`measureme-web`)**, update the version number in [`init.py`](fitbitme\src\__init__.py).
-
+Tags must be prefixed with the sub-project identifier (e.g. `core-v1.2.0`, `api-v1.2.0` or `fitbit-v1.2.0`).
 
 **NOTE:** Ensure that the relevant code (e.g. `__init__.py`) is committed before creating the tag!
 
@@ -39,9 +29,32 @@ version=core-v0.0.9
 git tag $version
 ```
 
+**NOTE:** When a major (breaking change) change affects *any* component, be sure to update *all* components to the next major version.
+
+Tag the changed component(s), as per the instructions.
+
+### Core
+For the **core library (`measureme`)**, update the version number in [`init.py`](measureme/src/measureme/__init__.py).
+
 *(Tip: In PowerShell, you can automatically extract and tag the core version safely avoiding quote-escaping problems:)*
 ```powershell
 $code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme/src/measureme/__init__.py').read()); print('core-v' + match.group(1)) if match else exit(1)";
+$version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
+```
+
+### FitBit API
+For the **FitBit API project (`fitbitme`)**, update the version number in [`init.py`](fitbitme/src/__init__.py).
+
+```powershell
+$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('fitbitme/src/__init__.py').read()); print('fitbit-v' + match.group(1)) if match else exit(1)";
+$version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
+```
+
+### MeasureMe API
+For the **MeasureMe API project (`measureme-web`)**, update the version number in [`init.py`](measureme-web/src/__init__.py).
+
+```powershell
+$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme-web/src/__init__.py').read()); print('api-v' + match.group(1)) if match else exit(1)";
 $version = python -c $code; if ($LASTEXITCODE -eq 0) { git tag $version; Write-Host "Created tag: $version" } else { Write-Host "Failed to find version" }
 ```
 
