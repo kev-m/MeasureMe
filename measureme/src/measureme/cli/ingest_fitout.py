@@ -230,10 +230,10 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         is_main_sleep = sleep_entry.get('mainSleep', True)
                         duration_s = sleep_entry.get('minutesAsleep', 0) * 60
 
-                        # log_id = str(sleep_entry.get('logId')) if sleep_entry.get('logId') else None
-                        # TODO: Check the time zone!! This is probably local naive time - it should be UTC for global ID.
-                        # TODO: Check that seconds are / should be 00 ?!?
-                        time_as_id = int(db_start.timestamp())
+                        # It is safe to cast to int, as Google TakeOut logId is a number
+                        log_id = int(sleep_entry.get('logId')
+                                     ) if sleep_entry.get('logId') else None
+
                         
                         summary = sleep_entry.get('levels', {}).get('summary', {})
                         if not summary and hasattr(sleep_entry, 'get'):
@@ -246,7 +246,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             sleep_entry['levels'].pop('shortData', None)
 
                         hs = SleepSession(
-                            global_id=time_as_id,
+                            global_id=log_id,
                             user_id=user_id,
                             source_id=FITBIT_SOURCE_ID,
                             start_time=db_start,
@@ -263,8 +263,9 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             time_in_bed_seconds=sleep_entry.get('timeInBed', 0) * 60
                         )
 
-                        if time_as_id:
-                            existing = session.query(SleepSession).filter_by(global_id=time_as_id).first()
+                        if log_id:
+                            existing = session.query(SleepSession).filter_by(
+                                global_id=log_id).first()
                         else:
                             existing = session.query(SleepSession).filter_by(
                                 user_id=user_id,
@@ -388,10 +389,6 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     duration_s = ex.get('duration', 0) // 1000
                     dt_end = dt_start + timedelta(seconds=duration_s)
 
-                    # Get the unique ID of this exercise from the "originalStartTime"
-                    time_as_id = dt_start.replace(second=0)
-                    time_as_id = int(time_as_id.timestamp())
-
                     # metadata = {
                     #     "activity_name": ex.get('activityName'),
                     #     "calories": ex.get('calories'),
@@ -404,10 +401,12 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     # metadata = {k: v for k, v in metadata.items()
                     #             if v is not None}
 
-                    # log_id = str(ex.get('logId')) if ex.get('logId') else None
+                    # Get the unique ID of this exercise from the "logId"
+                    # It is safe to cast to int, as Google TakeOut logId is a number
+                    log_id = int(ex.get('logId')) if ex.get('logId') else None
 
                     hs = ExerciseSession(
-                        global_id=time_as_id,
+                        global_id=log_id,
                         user_id=user_id,
                         source_id=FITBIT_SOURCE_ID,
                         start_time=dt_start,
@@ -422,8 +421,9 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         average_heart_rate=ex.get('averageHeartRate', 0)
                     )
 
-                    if time_as_id:
-                        existing = session.query(ExerciseSession).filter_by(global_id=time_as_id).first()
+                    if log_id:
+                        existing = session.query(ExerciseSession).filter_by(
+                            global_id=log_id).first()
                     else:
                         existing = session.query(ExerciseSession).filter_by(
                             user_id=user_id,

@@ -42,12 +42,12 @@ class FitbitDataMapper:
             start_time = datetime.fromisoformat(start_str)
             end_time = datetime.fromisoformat(end_str)
 
-            # log_id = str(sleep_entry.get('logId')) if sleep_entry.get('logId') else None
+            # It is safe to cast to int, as FitBit logId is a number
+            log_id = int(entry.get('logId')) if entry.get('logId') else None
             start_time_tz = start_time.replace(tzinfo=self.tz_info)
-            time_as_id = int(start_time_tz.timestamp())
 
             existing = self.db.query(models.SleepSession).filter_by(
-                global_id=time_as_id
+                global_id=log_id
             ).first()
 
             # If not existing, check for an existing sleep on the same day, within 2 hours
@@ -84,7 +84,7 @@ class FitbitDataMapper:
 
             if not existing:
                 session = models.SleepSession(
-                    global_id=time_as_id,
+                    global_id=log_id,
                     user_id=self.user_id,
                     source_id=self.source_id,
                     start_time=start_time,
@@ -134,9 +134,9 @@ class FitbitDataMapper:
             except Exception:
                 continue
 
-            # log_id = str(sleep_entry.get('logId')) if sleep_entry.get('logId') else None
+            # It is safe to cast to int, as FitBit logId is a number
+            log_id = int(act.get('logId')) if act.get('logId') else None
             start_time_tz = start_time.replace(tzinfo=self.tz_info)
-            time_as_id = int(start_time_tz.timestamp())
 
             averageHeartRate = act.get('averageHeartRate', 0)
             if averageHeartRate == 0:
@@ -149,7 +149,7 @@ class FitbitDataMapper:
             duration_s = dur_ms // 1000
 
             existing = self.db.query(models.ExerciseSession).filter_by(
-                global_id=time_as_id # str(act.get('logId'))
+                global_id=log_id # str(act.get('logId'))
             ).first()
 
             if not existing:
@@ -168,7 +168,7 @@ class FitbitDataMapper:
 
             if not existing:
                 session = models.ExerciseSession(
-                    global_id=time_as_id, # str(act.get('logId')),
+                    global_id=log_id, # str(act.get('logId')),
                     user_id=self.user_id,
                     source_id=self.source_id,
                     start_time=start_time,
