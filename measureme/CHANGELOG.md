@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.0 (2026-03-31)
+
+#### New Features
+
+* Reverting back to using logId as global_id.
+
+Full set of changes: [`v1.1.1...v1.2.0`](https://github.com/kev-m/MeasureMe/compare/core-v1.1.1...core-v1.2.0)
+
 ## v1.1.1 (2026-03-31)
 
 #### Fixes
