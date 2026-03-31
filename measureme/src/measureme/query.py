@@ -259,7 +259,7 @@ class MeasureMeQuery:
             # Calculate % deep sleep
             pct_deep = None
             if s.deep_sleep_seconds is not None and s.duration_seconds:
-                pct_deep = s.deep_sleep_seconds / s.duration_seconds
+                pct_deep = s.deep_sleep_seconds / (s.duration_seconds + s.awake_seconds)
 
             results.append({
                 "date": d_str,
