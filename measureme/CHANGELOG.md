@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.1 (2026-03-31)
+
+#### Fixes
+
+* FitBit app computes percentage deep by including awake time: deep/(asleep + awake).
+
+Full set of changes: [`v1.2.0...v1.2.1`](https://github.com/kev-m/MeasureMe/compare/core-v1.2.0...core-v1.2.1)
+
 ## v1.2.0 (2026-03-31)
 
 #### New Features
