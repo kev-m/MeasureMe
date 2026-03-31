@@ -16,7 +16,7 @@ pytest
 
 **MeasureMe** uses a semi-independent versioning strategy for its monorepo sub-projects.
 
-All sub-projects share the same `major.minor` version, but support individual `major.minor.patch`
+All sub-projects share the same `major` version, but support individual `major.minor.patch`
 versions to account for individual improvements.
 
 Tags must be prefixed with the sub-project identifier (e.g. `core-v1.2.0`, `api-v1.2.0` or `fitbit-v1.2.0`).
