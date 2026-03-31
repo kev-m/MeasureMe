@@ -155,14 +155,16 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
 
                 bhr_values = bhr_importer.get_data(s_dt_utc, e_dt_utc)
                 bhr_dates = getattr(bhr_importer, 'dates', [])
-               
+
                 # OPTIMIZATION: Query all existing PKs for the range first
-                min_ts = int(s_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
-                max_ts = int(e_dt_utc.replace(tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
+                min_ts = int(s_dt_utc.replace(
+                    tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
+                max_ts = int(e_dt_utc.replace(
+                    tzinfo=zoneinfo.ZoneInfo("UTC")).timestamp())
 
                 # Extract heart_rate_id using the key 'heart_rate'
                 heart_rate_id = MetricTypeFromString('heart_rate')
-                
+
                 existing_pks = set(
                     row[0] for row in session.query(HealthIntraday.timestamp_utc).filter(
                         HealthIntraday.user_id == user_id,
@@ -171,7 +173,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         HealthIntraday.timestamp_utc <= max_ts
                     ).all()
                 )
-                
+
                 new_mappings = []
                 for t, val in zip(bhr_dates, bhr_values):
                     if val is not None and t is not None:
@@ -179,9 +181,9 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         # Always coerce them to be explicitly UTC so .timestamp() computes absolute epoch correctly.
                         if t.tzinfo is None:
                             t = t.replace(tzinfo=zoneinfo.ZoneInfo("UTC"))
-                        
+
                         ts_val = int(t.timestamp())
-                        
+
                         if ts_val not in existing_pks:
                             new_mappings.append({
                                 'timestamp_utc': ts_val,
@@ -189,12 +191,12 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 'metric_type_id': heart_rate_id,
                                 'value': val
                             })
-                            
+
                 if new_mappings:
-                    # bulk_insert_mappings is dramatically faster than individual add() or merge() calls 
+                    # bulk_insert_mappings is dramatically faster than individual add() or merge() calls
                     # and skips SQLAlchemy tracking overhead.
                     session.bulk_insert_mappings(HealthIntraday, new_mappings)
-                    
+
             except AttributeError:
                 print("Warning: BasicHeartRate not found in fitout")
             except Exception as e:
@@ -234,12 +236,12 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                         log_id = int(sleep_entry.get('logId')
                                      ) if sleep_entry.get('logId') else None
 
-                        
-                        summary = sleep_entry.get('levels', {}).get('summary', {})
+                        summary = sleep_entry.get(
+                            'levels', {}).get('summary', {})
                         if not summary and hasattr(sleep_entry, 'get'):
                             # Fallback if fitout already flattened it
                             summary = sleep_entry
-                        
+
                         # Delete levels.data and levels.shortData
                         if 'levels' in sleep_entry:
                             sleep_entry['levels'].pop('data', None)
@@ -256,11 +258,16 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             metadata_json=json.dumps(sleep_entry),
                             is_main_sleep=is_main_sleep,
                             efficiency_score=sleep_entry.get('efficiency', 0),
-                            deep_sleep_seconds=summary.get('deep', {}).get('minutes', summary.get('summary_deep_mins', 0)) * 60,
-                            light_sleep_seconds=summary.get('light', {}).get('minutes', summary.get('summary_light_mins', 0)) * 60,
-                            rem_sleep_seconds=summary.get('rem', {}).get('minutes', summary.get('summary_rem_mins', 0)) * 60,
-                            awake_seconds=summary.get('wake', {}).get('minutes', summary.get('summary_wake_mins', mins_awake)) * 60,
-                            time_in_bed_seconds=sleep_entry.get('timeInBed', 0) * 60
+                            deep_sleep_seconds=summary.get('deep', {}).get(
+                                'minutes', summary.get('summary_deep_mins', 0)) * 60,
+                            light_sleep_seconds=summary.get('light', {}).get(
+                                'minutes', summary.get('summary_light_mins', 0)) * 60,
+                            rem_sleep_seconds=summary.get('rem', {}).get(
+                                'minutes', summary.get('summary_rem_mins', 0)) * 60,
+                            awake_seconds=summary.get('wake', {}).get(
+                                'minutes', summary.get('summary_wake_mins', mins_awake)) * 60,
+                            time_in_bed_seconds=sleep_entry.get(
+                                'timeInBed', 0) * 60
                         )
 
                         if log_id:
@@ -294,17 +301,19 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
             try:
                 values = importer.get_data(start, end)
                 dates = getattr(importer, 'dates', [])
-                
+
                 # Fetch existing metrics in bulk to avoid individual N+1 selects
                 existing_metrics_dict = {
                     m.timestamp: m for m in session.query(HealthMetric).filter(
                         HealthMetric.user_id == user_id,
                         HealthMetric.metric_type == metric_type,
-                        HealthMetric.timestamp >= datetime.combine(start, datetime.min.time()),
-                        HealthMetric.timestamp <= datetime.combine(end, datetime.max.time())
+                        HealthMetric.timestamp >= datetime.combine(
+                            start, datetime.min.time()),
+                        HealthMetric.timestamp <= datetime.combine(
+                            end, datetime.max.time())
                     ).all()
                 }
-                
+
                 for d, val in zip(dates, values):
                     if val is not None and d is not None:
                         # For daily metrics, it's already a date, so applying tz offset at midnight is less relevant,
@@ -326,7 +335,8 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                                 timezone=tz_name
                             )
                             session.add(m)
-                            existing_metrics_dict[dt] = m  # Track newly added to avoid duplicates if feed has them
+                            # Track newly added to avoid duplicates if feed has them
+                            existing_metrics_dict[dt] = m
                         else:
                             existing.value = val
                             existing.unit = unit
