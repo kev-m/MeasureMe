@@ -62,6 +62,7 @@ exclude = [
     "docs",
     "examples",
     "scripts",
+    "tests",
     "requirements-github.txt",
     "measureme_dev.db"
 ]
