@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.1 (2026-04-01)
+
+#### Fixes
+
+* Getting sessions and sleep to work properly with seconds/minutes/hours.
+
+Full set of changes: [`v2.0.0...v2.0.1`](https://github.com/kev-m/MeasureMe/compare/api-v2.0.0...api-v2.0.1)
+
 ## v2.0.0 (2026-04-01)
 
 #### New Features
