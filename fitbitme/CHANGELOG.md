@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.0.1 (2026-04-01)
+
+#### Fixes
+
+* Re-instating paths to get worker to run on NAS again.
+
+Full set of changes: [`v2.0.0...v2.0.1`](https://github.com/kev-m/MeasureMe/compare/fitbit-v2.0.0...fitbit-v2.0.1)
+
 ## v2.0.0 (2026-04-01)
 
 #### New Features
