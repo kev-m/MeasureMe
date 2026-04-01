@@ -254,12 +254,12 @@ class MeasureMeQuery:
             d_str = s.end_time.date().isoformat()
             day_metrics = metrics_by_date.get(d_str, {})
 
-            hours = s.duration_seconds / 3600.0 if s.duration_seconds else None
+            hours = s.duration_minutes / 60.0 if s.duration_minutes else None
             
             # Calculate % deep sleep
             pct_deep = None
-            if s.deep_sleep_seconds is not None and s.duration_seconds:
-                pct_deep = s.deep_sleep_seconds / (s.duration_seconds + s.awake_seconds)
+            if s.deep_sleep_minutes is not None and s.duration_minutes:
+                pct_deep = s.deep_sleep_minutes / (s.duration_minutes + s.awake_minutes)
 
             results.append({
                 "date": d_str,

@@ -38,7 +38,7 @@ def main():
         if not recent_sleep:
             print("No sleep data found.")
         for sleep in recent_sleep:
-            duration_hrs = sleep.duration_seconds / 3600.0 if sleep.duration_seconds else 0
+            duration_hrs = sleep.duration_minutes / 60.0 if sleep.duration_minutes else 0
             print(f"Date: {sleep.start_time.date()}, Duration: {duration_hrs:.2f} hours")
 
         # 2. Query the 5 most recent weight metrics

@@ -57,13 +57,13 @@
                     {% endif %}
                     <td>{{ s.start_time.time() }}</td>
                     <td>{{ s.end_time.time() }}</td>
-                    <td>{{ "%.2f"|format(s.duration_seconds / 3600) }}</td>
+                    <td>{{ "%.2f"|format(s.duration_minutes / 60) }}</td>
                     {% if session_type == 'sleep' %}
                         <td>{{ s.efficiency_score if s.efficiency_score is not none else "-" }}</td>
-                        <td>{{ "%.2f"|format(s.deep_sleep_seconds / 3600) if s.deep_sleep_seconds is not none else "-" }}</td>
-                        <td>{{ "%.2f"|format(s.light_sleep_seconds / 3600) if s.light_sleep_seconds is not none else "-" }}</td>
-                        <td>{{ "%.2f"|format(s.rem_sleep_seconds / 3600) if s.rem_sleep_seconds is not none else "-" }}</td>
-                        <td>{{ "%.2f"|format(s.awake_seconds / 3600) if s.awake_seconds is not none else "-" }}</td>
+                        <td>{{ "%.2f"|format(s.deep_sleep_minutes / 60) if s.deep_sleep_minutes is not none else "-" }}</td>
+                        <td>{{ "%.2f"|format(s.light_sleep_minutes / 60) if s.light_sleep_minutes is not none else "-" }}</td>
+                        <td>{{ "%.2f"|format(s.rem_sleep_minutes / 60) if s.rem_sleep_minutes is not none else "-" }}</td>
+                        <td>{{ "%.2f"|format(s.awake_minutes / 60) if s.awake_minutes is not none else "-" }}</td>
                     {% elif session_type == 'exercise' %}
                         <td>{{ s.activity_name if s.activity_name else "-" }}</td>
                         <td>{{ s.steps if s.steps is not none else "-" }}</td>

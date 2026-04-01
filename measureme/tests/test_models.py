@@ -29,7 +29,7 @@ def test_sleep_session_with_metadata(db_session):
         source_id=2,
         start_time=start_time,
         end_time=end_time,
-        duration_seconds=int((end_time - start_time).total_seconds()),
+        duration_minutes=int((end_time - start_time).total_seconds()/60),
         metadata_json=json.dumps({'stages': {'deep': 60, 'light': 180, 'rem': 90}})
     )
     db_session.add(session_data)
@@ -37,7 +37,7 @@ def test_sleep_session_with_metadata(db_session):
 
     retrieved = db_session.query(SleepSession).filter_by(global_id=12345).first()
     assert retrieved is not None
-    assert retrieved.duration_seconds == 8 * 3600
+    assert retrieved.duration_minutes == 8 * 60
     metadata = retrieved.get_metadata()
     assert 'stages' in metadata
     assert metadata['stages']['rem'] == 90

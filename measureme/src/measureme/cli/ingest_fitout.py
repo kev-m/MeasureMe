@@ -230,7 +230,7 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
 
                         mins_awake = sleep_entry.get('minutesAwake', 0)
                         is_main_sleep = sleep_entry.get('mainSleep', True)
-                        duration_s = sleep_entry.get('minutesAsleep', 0) * 60
+                        duration_m = sleep_entry.get('minutesAsleep', 0)
 
                         # It is safe to cast to int, as Google TakeOut logId is a number
                         log_id = int(sleep_entry.get('logId')
@@ -253,21 +253,21 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             source_id=FITBIT_SOURCE_ID,
                             start_time=db_start,
                             end_time=db_end,
-                            duration_seconds=duration_s,
+                            duration_minutes=duration_m,
                             timezone=tz_used,
                             metadata_json=json.dumps(sleep_entry),
                             is_main_sleep=is_main_sleep,
                             efficiency_score=sleep_entry.get('efficiency', 0),
-                            deep_sleep_seconds=summary.get('deep', {}).get(
-                                'minutes', summary.get('summary_deep_mins', 0)) * 60,
-                            light_sleep_seconds=summary.get('light', {}).get(
-                                'minutes', summary.get('summary_light_mins', 0)) * 60,
-                            rem_sleep_seconds=summary.get('rem', {}).get(
-                                'minutes', summary.get('summary_rem_mins', 0)) * 60,
-                            awake_seconds=summary.get('wake', {}).get(
-                                'minutes', summary.get('summary_wake_mins', mins_awake)) * 60,
-                            time_in_bed_seconds=sleep_entry.get(
-                                'timeInBed', 0) * 60
+                            deep_sleep_minutes=summary.get('deep', {}).get(
+                                'minutes', summary.get('summary_deep_mins', 0)) ,
+                            light_sleep_minutes=summary.get('light', {}).get(
+                                'minutes', summary.get('summary_light_mins', 0)) ,
+                            rem_sleep_minutes=summary.get('rem', {}).get(
+                                'minutes', summary.get('summary_rem_mins', 0)) ,
+                            awake_minutes=summary.get('wake', {}).get(
+                                'minutes', summary.get('summary_wake_mins', mins_awake)) ,
+                            time_in_bed_minutes=sleep_entry.get(
+                                'timeInBed', 0) 
                         )
 
                         if log_id:
@@ -284,16 +284,16 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                             session.add(hs)
                         else:
                             existing.end_time = hs.end_time
-                            existing.duration_seconds = hs.duration_seconds
+                            existing.duration_minutes = hs.duration_minutes
                             existing.timezone = hs.timezone
                             existing.metadata_json = hs.metadata_json
                             existing.is_main_sleep = hs.is_main_sleep
                             existing.efficiency_score = hs.efficiency_score
-                            existing.deep_sleep_seconds = hs.deep_sleep_seconds
-                            existing.light_sleep_seconds = hs.light_sleep_seconds
-                            existing.rem_sleep_seconds = hs.rem_sleep_seconds
-                            existing.awake_seconds = hs.awake_seconds
-                            existing.time_in_bed_seconds = hs.time_in_bed_seconds
+                            existing.deep_sleep_minutes = hs.deep_sleep_minutes
+                            existing.light_sleep_minutes = hs.light_sleep_minutes
+                            existing.rem_sleep_minutes = hs.rem_sleep_minutes
+                            existing.awake_minutes = hs.awake_minutes
+                            existing.time_in_bed_minutes = hs.time_in_bed_minutes
             except Exception as e:
                 print(f"Warning: Failed to import Sleep data: {e}")
 
@@ -398,7 +398,6 @@ def process_export(path: str, db_url: str, start: date, end: date, only_types: l
                     # Fitbit provides milliseconds
                     duration_s = ex.get('duration', 0) // 1000
                     dt_end = dt_start + timedelta(seconds=duration_s)
-
                     # metadata = {
                     #     "activity_name": ex.get('activityName'),
                     #     "calories": ex.get('calories'),

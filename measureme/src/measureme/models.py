@@ -26,17 +26,17 @@ class SleepSession(Base):
         a deterministic hash (e.g. SHA-1 of ``user_id + start_time``) is acceptable.
 
     Duration vs. time in bed:
-        ``duration_seconds`` reflects the total *sleep* duration as reported by the
-        vendor (i.e. deep + light + REM + awake seconds). ``time_in_bed_seconds`` is the
+        ``duration_minutes`` reflects the total *sleep* duration as reported by the
+        vendor (i.e. deep + light + REM + awake minutes). ``time_in_bed_minutes`` is the
         broader window from when the user got into bed to when they got out, and will
         typically be larger. If a vendor does not distinguish between the two, populate
-        ``duration_seconds`` and leave ``time_in_bed_seconds`` null.
+        ``duration_minutes`` and leave ``time_in_bed_minutes`` null.
 
     Sleep stages:
-        ``deep_sleep_seconds``, ``light_sleep_seconds``, ``rem_sleep_seconds``, and
-        ``awake_seconds`` should sum to ``duration_seconds``. If the vendor does not
+        ``deep_sleep_minutes``, ``light_sleep_minutes``, ``rem_sleep_minutes``, and
+        ``awake_minutes`` should sum to ``duration_minutes``. If the vendor does not
         report granular stages (e.g. it only reports a single total), leave the stage
-        columns null and populate only ``duration_seconds``.
+        columns null and populate only ``duration_minutes``.
 
     Ingestor guidance:
         - Fitbit Takeout: parse ``sleep-YYYY-MM-DD.json``; each element in the ``sleep``
@@ -44,7 +44,7 @@ class SleepSession(Base):
         - Fitbit Webhook/API: ``POST /1.2/user/-/sleep/list`` response; same ``logId``
           field.
         - Other vendors: map the closest equivalent unique sleep-log identifier to
-          ``global_id``, normalise all stage durations to seconds, and set
+          ``global_id``, normalise all stage durations to minutes, and set
           ``is_main_sleep = 1`` for the primary overnight sleep per calendar day.
     """
     __tablename__ = 'sleep_session'
@@ -53,15 +53,17 @@ class SleepSession(Base):
     source_id = Column(Integer, nullable=False)
     start_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=False)
-    duration_seconds = Column(Integer, nullable=False)
+    duration_minutes = Column(Integer, nullable=False)
 
     is_main_sleep = Column(Integer, nullable=True)
+
+    deep_sleep_minutes = Column(Integer, nullable=True)
+    light_sleep_minutes = Column(Integer, nullable=True)
+    rem_sleep_minutes = Column(Integer, nullable=True)
+
+    awake_minutes = Column(Integer, nullable=True)
+    time_in_bed_minutes = Column(Integer, nullable=True)
     efficiency_score = Column(Integer, nullable=True)
-    deep_sleep_seconds = Column(Integer, nullable=True)
-    light_sleep_seconds = Column(Integer, nullable=True)
-    rem_sleep_seconds = Column(Integer, nullable=True)
-    awake_seconds = Column(Integer, nullable=True)
-    time_in_bed_seconds = Column(Integer, nullable=True)
 
     timezone = Column(String(50), nullable=True, default='Europe/London')
     metadata_json = Column(Text)
@@ -110,10 +112,10 @@ class ExerciseSession(Base):
     source_id = Column(Integer, nullable=False)
     start_time = Column(DateTime, nullable=False, index=True)
     end_time = Column(DateTime, nullable=False)
-    duration_seconds = Column(Integer, nullable=False)
     timezone = Column(String(50), nullable=True, default='Europe/London')
 
     activity_name = Column(String(100), nullable=True)
+    duration_seconds = Column(Integer, nullable=False)
     steps = Column(Integer, nullable=True)
     calories_burned = Column(Float, nullable=True)
     distance_km = Column(Float, nullable=True)

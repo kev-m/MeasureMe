@@ -32,7 +32,7 @@ class FitbitDataMapper:
             existing.unit = unit
             existing.timezone = self.tz_name
 
-    def process_sleep(self, sleep_data: dict):
+    def process_sleep(self, sleep_data: dict, search: bool = False):
         sleep_entries = sleep_data.get('sleep', [])
         for entry in sleep_entries:
             start_str = entry.get('startTime')
@@ -52,8 +52,9 @@ class FitbitDataMapper:
             ).first()
 
             # If not existing, check for an existing sleep on the same day, within 2 hours
-            if not existing:
-                duration_s = entry.get('minutesAsleep', 0) * 60
+            if not existing and search:
+                log.info("Unable to find sleep with ID %s, trying fallback", log_id)
+                duration_m = entry.get('minutesAsleep', 0)
                 # Fallback heuristic: matching duration within +/- 24 hours
                 tw_start = start_time_tz - timedelta(hours=2)
                 tw_end = start_time_tz + timedelta(hours=2)
@@ -65,7 +66,8 @@ class FitbitDataMapper:
                     models.SleepSession.start_time <= tw_end
                 ).all()
                 for p in potentials:
-                    if abs(p.duration_seconds - duration_s) <= 60*60:  # Within 60 minutes duration
+                    if abs(p.duration_minutes - duration_m) <= 60:  # Within 60 minutes duration
+                        log.info("Found replacement sleep of ID %s with ID %s", log_id, p.global_id)
                         existing = p
                         break
 
@@ -79,7 +81,7 @@ class FitbitDataMapper:
             entry.pop('minuteData', None)
 
             # 2. Pre-calculate common values
-            duration = entry.get('minutesAsleep', 0) * 60
+            duration = entry.get('minutesAsleep', 0)
             metadata = json.dumps(entry)
 
             levels_summary = entry.get('levels', {}).get('summary', {})
@@ -91,42 +93,43 @@ class FitbitDataMapper:
                     source_id=self.source_id,
                     start_time=start_time,
                     end_time=end_time,
-                    duration_seconds=duration,
+                    duration_minutes=duration,
                     timezone=self.tz_name,
                     metadata_json=metadata,
                     is_main_sleep=entry.get('isMainSleep', True),
                     efficiency_score=entry.get('efficiency', 0),
-                    deep_sleep_seconds=levels_summary.get(
-                        'deep', {}).get('minutes', 0) * 60,
-                    light_sleep_seconds=levels_summary.get(
-                        'light', {}).get('minutes', 0) * 60,
-                    rem_sleep_seconds=levels_summary.get(
-                        'rem', {}).get('minutes', 0) * 60,
-                    awake_seconds=levels_summary.get(
-                        'wake', {}).get('minutes', 0) * 60,
-                    time_in_bed_seconds=entry.get('timeInBed', 0) * 60
+                    deep_sleep_minutes=levels_summary.get(
+                        'deep', {}).get('minutes', 0),
+                    light_sleep_minutes=levels_summary.get(
+                        'light', {}).get('minutes', 0),
+                    rem_sleep_minutes=levels_summary.get(
+                        'rem', {}).get('minutes', 0),
+                    awake_minutes=levels_summary.get(
+                        'wake', {}).get('minutes', 0),
+                    time_in_bed_minutes=entry.get('timeInBed', 0)
                 )
                 self.db.add(session)
             else:
-                existing.start_time = start_time  # Update the start time, too!
+                existing.global_id=log_id           # Update with the newest log_id, too!
+                existing.start_time = start_time    # Update the start time, too!
                 existing.end_time = end_time
-                existing.duration_seconds = duration
+                existing.duration_minutes = duration
                 existing.timezone = self.tz_name
                 existing.metadata_json = metadata
                 existing.is_main_sleep = entry.get('isMainSleep', True)
                 existing.efficiency_score = entry.get('efficiency', 0)
-                existing.deep_sleep_seconds = levels_summary.get(
-                    'deep', {}).get('minutes', 0) * 60
-                existing.light_sleep_seconds = levels_summary.get(
-                    'light', {}).get('minutes', 0) * 60
-                existing.rem_sleep_seconds = levels_summary.get(
-                    'rem', {}).get('minutes', 0) * 60
-                existing.awake_seconds = levels_summary.get(
-                    'wake', {}).get('minutes', 0) * 60
-                existing.time_in_bed_seconds = entry.get('timeInBed', 0) * 60
+                existing.deep_sleep_minutes = levels_summary.get(
+                    'deep', {}).get('minutes', 0) 
+                existing.light_sleep_minutes = levels_summary.get(
+                    'light', {}).get('minutes', 0) 
+                existing.rem_sleep_minutes = levels_summary.get(
+                    'rem', {}).get('minutes', 0) 
+                existing.awake_minutes = levels_summary.get(
+                    'wake', {}).get('minutes', 0) 
+                existing.time_in_bed_minutes = entry.get('timeInBed', 0) 
         self.db.commit()
 
-    def process_activities(self, activities_data: dict, date_str: str):
+    def process_activities(self, activities_data: dict, date_str: str, search: bool = False):
         summary = activities_data.get('summary', {})
         dt = datetime.strptime(date_str, "%Y-%m-%d")
 
@@ -163,7 +166,7 @@ class FitbitDataMapper:
                 global_id=log_id  # str(act.get('logId'))
             ).first()
 
-            if not existing:
+            if not existing and search:
                 log.info("Unable to find activity with ID %s, trying fallback", log_id)
                 # Fallback heuristic: matching duration within +/- 24 hours
                 tw_start = start_time - timedelta(hours=24)
@@ -297,7 +300,7 @@ class FitbitFetcher:
                 log.debug(f"Raw sleep data from API: {json.dumps(data)}")
                 log.info(
                     f"Successfully fetched {len(data.get('sleep', []))} sleep records.")
-                self.mapper.process_sleep(data)
+                self.mapper.process_sleep(data, not is_webhook)
 
                 if is_webhook:
                     # Webhooks only tell us about 'sleep', not BR or HRV. We opportunistically grab them.
@@ -331,7 +334,7 @@ class FitbitFetcher:
                     f"activities/date/{date_str}.json")
                 log.debug(f"Raw activity data from API: {json.dumps(data)}")
                 log.info("Successfully fetched activity records.")
-                self.mapper.process_activities(data, date_str)
+                self.mapper.process_activities(data, date_str, not is_webhook)
 
                 if collection_type == 'activities' and is_webhook:
                     # Webhooks group intraday HR under 'activities', grab it.
