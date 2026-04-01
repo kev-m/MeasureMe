@@ -1,0 +1,20 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "ghealthme"
+description = "Google Health API ingestor for MeasureMe"
+readme = "README.md"
+authors = [{name = "MeasureMe", email = "measureme@example.com"}]
+dynamic = ["version"]
+dependencies = [
+    "measureme",
+    "flask",
+    "requests",
+    "google-auth-oauthlib",
+    "google-api-python-client"
+]
+
+[project.urls]
+Home = "https://github.com/kev-m/MeasureMe"
