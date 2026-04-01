@@ -30,17 +30,11 @@ For the **core library (`measureme`)**, update the version number in [`init.py`]
 
 *(Tip: In PowerShell, you can automatically extract the target version safely avoiding quote-escaping problems:)*
 ```powershell
-$code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme/src/measureme/__init__.py').read()); print('core-v' + match.group(1)) if match else exit(1)";
-$version = python -c $code; if ($LASTEXITCODE -eq 0) { Write-Host "Target Version: $version" } else { Write-Host "Failed to find version" }
-```
-
-```powershell
 $loc = "measureme"
 $comp = "core-v"
 $code = "import re; match=re.search(r'__version__\s*=\s*[\x22\x27]v?([^\x22\x27]+)[\x22\x27]', open('measureme/src/measureme/__init__.py').read()); print('$comp' + match.group(1)) if match else exit(1)";
 $version = python -c $code; if ($LASTEXITCODE -eq 0) { Write-Host "Target Version: $version" } else { Write-Host "Failed to find version" }
 ```
-
 
 ### FitBit API
 For the **FitBit API project (`fitbitme`)**, update the version number in [`init.py`](fitbitme/src/__init__.py).
