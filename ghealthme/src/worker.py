@@ -77,6 +77,9 @@ def run_worker(token_path, job_db_path, data_db_path, timezone_path):
     Continuously loops checking the lightweight SQLite queue for new events.
     """
     log.info("Starting FitBitMe Background Worker...")
+
+    init_queue_db(job_db_path)
+
     job_id = None
     while True:
         try:

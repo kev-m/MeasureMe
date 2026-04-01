@@ -11,26 +11,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 from measureme import database
 
-load_dotenv()
-
-STORAGE_DIR = os.environ.get('STORAGE_DIR', 'storage')
-GH_TOKEN_FILE = os.environ.get('GH_TOKEN_FILE', os.path.join(STORAGE_DIR, "ghealth_tokens.json"))
-MEASUREME_DB = os.environ.get('MEASUREME_DB', os.path.join(STORAGE_DIR,'measureme.db'))
-
-print(f"Found STORAGE_DIR: {STORAGE_DIR}")
-print(f"Found TOKEN_FILE: {GH_TOKEN_FILE}")
-print(f"Found MEASUREME_DB: {MEASUREME_DB}")
-
 from ghealthme.ghealth_common import load_credentials, GHealthFetcher, GHealthDataMapper
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("ingest_ghealth")
 
-def fetch_and_store_historical_data(db_url: str, start_date: date, end_date: date, only_types: list = None, tz_name: str = "Europe/London"):
+def fetch_and_store_historical_data(token_file : str, db_url: str, start_date: date, end_date: date, only_types: list = None, tz_name: str = "Europe/London"):
     logger.info("Starting standalone Google Health API ingestion script...")
     logger.info(f"Target DB: {db_url}, Dates: {start_date} to {end_date}, Types: {only_types}, Timezone: {tz_name}")
     
-    creds = load_credentials(GH_TOKEN_FILE)
+    creds = load_credentials(token_file)
     if not creds or not creds.valid:
         logger.error("No valid credentials found. Please authenticate via the ghealthme web service first.")
         sys.exit(1)
@@ -65,6 +55,17 @@ def fetch_and_store_historical_data(db_url: str, start_date: date, end_date: dat
         db_session.close()
 
 def main():
+
+    load_dotenv()
+
+    STORAGE_DIR = os.environ.get('STORAGE_DIR', 'storage')
+    GH_TOKEN_FILE = os.environ.get('GH_TOKEN_FILE', os.path.join(STORAGE_DIR, "ghealth_tokens.json"))
+    MEASUREME_DB = os.environ.get('MEASUREME_DB', os.path.join(STORAGE_DIR,'measureme.db'))
+
+    print(f"Found STORAGE_DIR: {STORAGE_DIR}")
+    print(f"Found TOKEN_FILE: {GH_TOKEN_FILE}")
+    print(f"Found MEASUREME_DB: {MEASUREME_DB}")
+
     parser = argparse.ArgumentParser(
         description="Ingest historical data directly from Google Health API into MeasureMe.")
     parser.add_argument(
@@ -87,7 +88,7 @@ def main():
         logger.error("Start date must be before or equal to End date.")
         sys.exit(1)
 
-    fetch_and_store_historical_data(
+    fetch_and_store_historical_data(GH_TOKEN_FILE,
         args.db, s_date, e_date, args.types, args.timezone)
 
 
