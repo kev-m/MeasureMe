@@ -1,16 +1,17 @@
 import time
 import os
+import sys
 import logging
 
 from dotenv import load_dotenv
 
 from measureme import database
-from web_services.services.queue_db import get_next_job, mark_job_complete, mark_job_failed
-
 from fitbit_common import FitbitDataMapper, FitbitFetcher
 from fitbit_client import FitbitClient
 
-load_dotenv()
+# Hack to support testing on the NAS
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+from web_services.services.queue_db import get_next_job, mark_job_complete, mark_job_failed
 
 # Configure basic logging for the worker
 logging.basicConfig(
@@ -106,6 +107,8 @@ def run_worker(job_db_path, data_db_path, timezone_path):
 
 
 if __name__ == '__main__':
+    load_dotenv()
+    
     QUEUE_DB_PATH = os.environ.get('QUEUE_DB_PATH', 'storage/jobs.db')
     MEASUREME_DB = os.environ.get('MEASUREME_DB', 'storage/measureme_fb.db')
     TZ_FILE_PATH = os.environ.get('TZ_FILE_PATH', 'storage/timezone.txt')
