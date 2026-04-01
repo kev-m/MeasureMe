@@ -100,19 +100,20 @@ def extract_start_end_times(tz_info, interval: Dict[str, Any]) -> tuple[str, dat
             # available zoneinfo zones for a zone that has the same offset at the
             # start datetime. This is best-effort and may return the first match.
             tz_name_from_offset = None
-            try:
-                from zoneinfo import available_timezones
-                start_dt_aware = start_dt_utc
-                for candidate in available_timezones():
-                    try:
-                        zi = ZoneInfo(candidate)
-                        if start_dt_aware.astimezone(zi).utcoffset().total_seconds() == start_offset_sec:
-                            tz_name_from_offset = candidate
-                            break
-                    except Exception:
-                        continue
-            except Exception:
-                tz_name_from_offset = None
+            
+            # try:
+            #     from zoneinfo import available_timezones
+            #     start_dt_aware = start_dt_utc
+            #     for candidate in available_timezones():
+            #         try:
+            #             zi = ZoneInfo(candidate)
+            #             if start_dt_aware.astimezone(zi).utcoffset().total_seconds() == start_offset_sec:
+            #                 tz_name_from_offset = candidate
+            #                 break
+            #         except Exception:
+            #             continue
+            # except Exception:
+            #     tz_name_from_offset = None
 
             # Fallback to a UTC±HH:MM string if no IANA name was found
             if not tz_name_from_offset:
@@ -303,7 +304,7 @@ class GHealthDataMapper:
         try:
             for entry in summary_data:
                 if entry.get('type', '') == key:
-                    return int(entry.get('minutes', 0))*60
+                    return int(entry.get('minutes', 0))
         except Exception as e:
             log.exception("Exception parsing sleep_summary: %s", str(e))
             return 0
@@ -332,11 +333,11 @@ class GHealthDataMapper:
         except ValueError:
             return
 
-        duration_seconds = int((end_time - start_time).total_seconds())
-
         metadata = json.dumps(entry)
         summary = entry.get('summary', {})
         levels_summary = summary.get('stagesSummary', {})
+
+        duration_minutes = int(summary.get('minutesAsleep', 0))
 
         # efficiency is not automatically calculated
         # efficiency = 
@@ -350,32 +351,32 @@ class GHealthDataMapper:
                 source_id=self.source_id,
                 start_time=start_time,
                 end_time=end_time,
-                duration_seconds=duration_seconds,
+                duration_minutes=duration_minutes,
                 timezone=tz_name,
                 metadata_json=metadata,
                 # Others
                 is_main_sleep=entry.get('type', '') == 'STAGES',
                 # efficiency_score=efficiency,
-                deep_sleep_seconds=self.extract_sleep_summary(levels_summary, 'DEEP'),
-                light_sleep_seconds=self.extract_sleep_summary(levels_summary, 'LIGHT'),
-                rem_sleep_seconds=self.extract_sleep_summary(levels_summary, 'REM'),
-                awake_seconds=self.extract_sleep_summary(levels_summary, 'AWAKE'),
-                time_in_bed_seconds=int(summary.get('minutesInSleepPeriod', 0))*60
+                deep_sleep_minutes=self.extract_sleep_summary(levels_summary, 'DEEP'),
+                light_sleep_minutes=self.extract_sleep_summary(levels_summary, 'LIGHT'),
+                rem_sleep_minutes=self.extract_sleep_summary(levels_summary, 'REM'),
+                awake_minutes=self.extract_sleep_summary(levels_summary, 'AWAKE'),
+                time_in_bed_minutes=int(summary.get('minutesInSleepPeriod', 0))*60
             )
             self.db.add(sleep_record)
         else:
             existing.start_time = start_time
             existing.end_time = end_time
-            existing.duration_seconds = duration_seconds
+            existing.duration_minutes = duration_minutes
             existing.metadata_json = metadata
             existing.timezone = tz_name
             # Others
             existing.is_main_sleep = entry.get('type', '') == 'STAGES'
-            existing.deep_sleep_seconds = self.extract_sleep_summary(levels_summary, 'DEEP')
-            existing.light_sleep_seconds = self.extract_sleep_summary(levels_summary, 'LIGHT')
-            existing.rem_sleep_seconds = self.extract_sleep_summary(levels_summary, 'REM')
-            existing.awake_seconds = self.extract_sleep_summary(levels_summary, 'AWAKE')
-            existing.time_in_bed_seconds = int(summary.get('minutesInSleepPeriod', 0))*60
+            existing.deep_sleep_minutes = self.extract_sleep_summary(levels_summary, 'DEEP')
+            existing.light_sleep_minutes = self.extract_sleep_summary(levels_summary, 'LIGHT')
+            existing.rem_sleep_minutes = self.extract_sleep_summary(levels_summary, 'REM')
+            existing.awake_minutes = self.extract_sleep_summary(levels_summary, 'AWAKE')
+            existing.time_in_bed_minutes = int(summary.get('minutesInSleepPeriod', 0))*60
 
     def _process_exercise_session(self, point: Dict[str, Any]):
 
