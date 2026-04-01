@@ -77,6 +77,7 @@ def run_worker(job_db_path, data_db_path, timezone_path):
     """
     log.info("Starting FitBitMe Background Worker...")
 
+    job_id = None
     while True:
         try:
             job_id, payload = get_next_job(db_path=job_db_path)
