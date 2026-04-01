@@ -18,14 +18,14 @@ oauth_bp = Blueprint('oauth', __name__, url_prefix='/oauth')
 
 load_dotenv()
 
-STORAGE_DIR = os.environ.get('GHEALTH_STORAGE_DIR', 'storage')
+STORAGE_DIR = os.environ.get('STORAGE_DIR', 'storage')
 CREDENTIALS_FILE = os.path.join(STORAGE_DIR, os.environ.get('GHEALTH_CREDENTIALS', ''))
-TOKEN_FILE = os.path.join(STORAGE_DIR, "ghealth_tokens.json")
+GH_TOKEN_FILE = os.path.join(STORAGE_DIR, "ghealth_tokens.json")
 OAUTH_URI = os.environ.get('OAUTH_URI', 'http://localhost:8124/oauth/callback')
 
 print(f"Found STORAGE_DIR: {STORAGE_DIR}")
 print(f"Found CREDENTIALS_FILE: {CREDENTIALS_FILE}")
-print(f"Found TOKEN_FILE: {TOKEN_FILE}")
+print(f"Found GH_TOKEN_FILE: {GH_TOKEN_FILE}")
 print(f"Found OAUTH_URI: {OAUTH_URI}")
 
 @oauth_bp.route('/login')
@@ -99,7 +99,7 @@ def callback():
     
     credentials = flow.credentials
     Path(STORAGE_DIR).mkdir(parents=True, exist_ok=True)
-    with open(TOKEN_FILE, 'w') as f:
+    with open(GH_TOKEN_FILE, 'w') as f:
         f.write(credentials.to_json())
 
     return "Google Health authentication successful! Tokens saved securely. You can close this window."

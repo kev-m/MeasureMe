@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-from ghealthme.db_queue import init_queue_db, add_job, get_next_job, mark_job_complete, mark_job_failed
+from ghealthme.db_queue import init_queue_db, get_next_job, mark_job_complete, mark_job_failed
 from ghealthme.ghealth_common import load_credentials, GHealthFetcher, GHealthDataMapper
 from measureme import database
 
@@ -110,9 +110,9 @@ def run_worker(token_path, job_db_path, data_db_path, timezone_path):
 if __name__ == "__main__":
     load_dotenv()
 
-    STORAGE_DIR = os.environ.get('GHEALTH_STORAGE_DIR', 'storage')
+    STORAGE_DIR = os.environ.get('STORAGE_DIR', 'storage')
     GH_TOKEN_FILE = os.environ.get('GH_TOKEN_FILE', os.path.join(STORAGE_DIR, "ghealth_tokens.json"))
-    MEASUREME_DB = os.environ.get('MEASUREME_DB', os.path.join(STORAGE_DIR,'measureme_ghealth.db'))
+    MEASUREME_DB = os.environ.get('MEASUREME_DB', os.path.join(STORAGE_DIR,'measureme.db'))
     GH_JOBS_DB = os.environ.get('GH_JOBS_DB', os.path.join(STORAGE_DIR,'gh_jobs.db'))
     TZ_FILE_PATH = os.environ.get('TZ_FILE_PATH', os.path.join(STORAGE_DIR, 'timezone.txt'))
 
@@ -121,5 +121,5 @@ if __name__ == "__main__":
     log.info(f"Using Data DB path: '{MEASUREME_DB}'")
     log.info(f"Using time-zone path: '{TZ_FILE_PATH}'")
 
-    run_worker(token_path=GH_TOKEN_FILE, jobs_path=GH_JOBS_DB, data_jobs_path=MEASUREME_DB,
+    run_worker(token_path=GH_TOKEN_FILE, job_db_path=GH_JOBS_DB, data_db_path=MEASUREME_DB,
                timezone_path=TZ_FILE_PATH)

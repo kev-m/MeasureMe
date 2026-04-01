@@ -13,11 +13,11 @@ from measureme import database
 
 load_dotenv()
 
-GHEALTH_STORAGE_DIR = os.environ.get('GHEALTH_STORAGE_DIR', 'storage')
-GH_TOKEN_FILE = os.environ.get('GH_TOKEN_FILE', os.path.join(GHEALTH_STORAGE_DIR, "ghealth_tokens.json"))
-MEASUREME_DB = os.environ.get('MEASUREME_DB', os.path.join(GHEALTH_STORAGE_DIR,'measureme_ghealth.db'))
+STORAGE_DIR = os.environ.get('STORAGE_DIR', 'storage')
+GH_TOKEN_FILE = os.environ.get('GH_TOKEN_FILE', os.path.join(STORAGE_DIR, "ghealth_tokens.json"))
+MEASUREME_DB = os.environ.get('MEASUREME_DB', os.path.join(STORAGE_DIR,'measureme.db'))
 
-print(f"Found GHEALTH_STORAGE_DIR: {GHEALTH_STORAGE_DIR}")
+print(f"Found STORAGE_DIR: {STORAGE_DIR}")
 print(f"Found TOKEN_FILE: {GH_TOKEN_FILE}")
 print(f"Found MEASUREME_DB: {MEASUREME_DB}")
 
