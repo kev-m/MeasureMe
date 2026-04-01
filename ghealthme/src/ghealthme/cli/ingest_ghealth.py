@@ -13,12 +13,12 @@ from measureme import database
 
 load_dotenv()
 
-STORAGE_DIR = os.environ.get('GHEALTH_STORAGE_DIR', 'storage')
-TOKEN_FILE = os.path.join(STORAGE_DIR, "ghealth_tokens.json")
-MEASUREME_DB = os.environ.get('MEASUREME_DB', 'storage/measureme_ghealth.db')
+GHEALTH_STORAGE_DIR = os.environ.get('GHEALTH_STORAGE_DIR', 'storage')
+GH_TOKEN_FILE = os.environ.get('GH_TOKEN_FILE', os.path.join(GHEALTH_STORAGE_DIR, "ghealth_tokens.json"))
+MEASUREME_DB = os.environ.get('MEASUREME_DB', os.path.join(GHEALTH_STORAGE_DIR,'measureme_ghealth.db'))
 
-print(f"Found STORAGE_DIR: {STORAGE_DIR}")
-print(f"Found TOKEN_FILE: {TOKEN_FILE}")
+print(f"Found GHEALTH_STORAGE_DIR: {GHEALTH_STORAGE_DIR}")
+print(f"Found TOKEN_FILE: {GH_TOKEN_FILE}")
 print(f"Found MEASUREME_DB: {MEASUREME_DB}")
 
 from ghealthme.ghealth_common import load_credentials, GHealthFetcher, GHealthDataMapper
@@ -30,7 +30,7 @@ def fetch_and_store_historical_data(db_url: str, start_date: date, end_date: dat
     logger.info("Starting standalone Google Health API ingestion script...")
     logger.info(f"Target DB: {db_url}, Dates: {start_date} to {end_date}, Types: {only_types}, Timezone: {tz_name}")
     
-    creds = load_credentials(TOKEN_FILE)
+    creds = load_credentials(GH_TOKEN_FILE)
     if not creds or not creds.valid:
         logger.error("No valid credentials found. Please authenticate via the ghealthme web service first.")
         sys.exit(1)

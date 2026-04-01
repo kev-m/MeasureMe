@@ -10,56 +10,73 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "storage" / "jobs.db"
-
-def init_db():
-    """Initializes the background worker job queue for Google Health payloads."""
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(str(DB_PATH)) as conn:
-        cursor = DB_PATH.name
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS sync_jobs (
+def init_queue_db(jobs_path: str):
+    """Initializes the lightweight SQLite jobs queue."""
+    with sqlite3.connect(jobs_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS jobs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 endpoint TEXT NOT NULL,
-                payload TEXT NOT NULL,
-                status TEXT DEFAULT 'pending',
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 processed_at TIMESTAMP
             )
         ''')
         conn.commit()
 
-def enqueue_job(endpoint: str, payload: dict):
-    """Enqueues a webhook notification or manual trigger for background processing."""
-    with sqlite3.connect(str(DB_PATH)) as conn:
-        conn.execute(
-            "INSERT INTO sync_jobs (endpoint, payload) VALUES (?, ?)",
-            (endpoint, json.dumps(payload))
+def add_job(endpoint : str, payload: dict, jobs_path: str):
+    """Inserts a new webhook payload into the queue."""
+    with sqlite3.connect(jobs_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO jobs (endpoint, payload_json, status) VALUES (?, ?, 'pending')",
+            (endpoint, json.dumps(payload),)
         )
         conn.commit()
 
-def get_pending_jobs():
-    """Retrieves all pending jobs."""
-    with sqlite3.connect(str(DB_PATH)) as conn:
+def get_next_job(jobs_path: str) -> tuple[int, str, dict]:
+    """Fetches the oldest pending job and locks it by setting status to 'processing'."""
+    with sqlite3.connect(jobs_path) as conn:
         conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        cur.execute("SELECT id, endpoint, payload FROM sync_jobs WHERE status = 'pending' ORDER BY created_at ASC")
-        return cur.fetchall()
+        cursor = conn.cursor()
+        
+        # We use a simple select then update approach. For high concurrency, SQLite handles it,
+        # but in our lightweight NAS environment, this simple polling is perfectly safe.
+        cursor.execute(
+            "SELECT id, endpoint, payload_json FROM jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1"
+        )
+        row = cursor.fetchone()
+        
+        if row:
+            job_id = row['id']
+            endpoint = row['endpoint,']
+            # Lock the job
+            cursor.execute(
+                "UPDATE jobs SET status = 'processing', processed_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (job_id,)
+            )
+            conn.commit()
+            return job_id, endpoint, json.loads(row['payload_json'])
+        return None, None, None
 
-def mark_job_complete(job_id: int):
-    """Marks a job as successfully processed."""
-    with sqlite3.connect(str(DB_PATH)) as conn:
-        conn.execute(
-            "UPDATE sync_jobs SET status = 'complete', processed_at = ? WHERE id = ?",
-            (datetime.utcnow().isoformat(), job_id)
+def mark_job_complete(job_id: int, jobs_path: str):
+    """Marks a job as completed."""
+    with sqlite3.connect(jobs_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE jobs SET status = 'completed' WHERE id = ?",
+            (job_id,)
         )
         conn.commit()
 
-def mark_job_failed(job_id: int):
-    """Marks a job as failed."""
-    with sqlite3.connect(str(DB_PATH)) as conn:
-        conn.execute(
-            "UPDATE sync_jobs SET status = 'failed', processed_at = ? WHERE id = ?",
-            (datetime.utcnow().isoformat(), job_id)
+def mark_job_failed(job_id: int, error_msg: str, jobs_path: str):
+    """Marks a job as failed, adding minimal error context to the payload."""
+    with sqlite3.connect(jobs_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE jobs SET status = 'failed', payload_json = json_insert(payload_json, '$.error', ?) WHERE id = ?",
+            (error_msg, job_id)
         )
         conn.commit()
