@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.0.0 (2026-04-01)
+
+#### New Features
+
+* Changing sleep times from seconds to minutes.
+#### Fixes
+
+* (doc): Correcting URL to examples.
+
+Full set of changes: [`v1.2.1...v2.0.0`](https://github.com/kev-m/MeasureMe/compare/core-v1.2.1...core-v2.0.0)
+
 ## v1.2.1 (2026-03-31)
 
 #### Fixes
