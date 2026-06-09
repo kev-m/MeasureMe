@@ -31,6 +31,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/googlehealth.ecg.readonly"
 ]
 
+BASIC_TYPES = ['sleep', 'exercise', 'weight', 'hrv', 'resting_heart_rate', 'breathing_rate']
+ALL_TYPES = BASIC_TYPES + ['intraday_heart_rate']
 
 def load_credentials(token_path : str) -> Credentials:
     """Loads Google credentials from the local token.json file and refreshes if expired."""
@@ -143,26 +145,26 @@ class GHealthDataMapper:
         except:
             self.tz_info = None
 
-    def process_data_points(self, data_points: List[Dict[str, Any]]):
+    def process_data_points_by_type(self, collection_type: str, data_points: List[Dict[str, Any]]):
         """
-        Process Google Health API 'data points'.
+        Processes data points of a specific type. Useful for directed fetching.
         """
         for point in data_points:
-            if 'sleep' in point:
+            if collection_type == 'sleep':
                 self._process_sleep_session(point)
-            elif 'exercise' in point:
+            elif collection_type == 'exercise':
                 self._process_exercise_session(point)
-            elif 'weight' in point:
+            elif collection_type == 'weight':
                 self._process_health_metric(point, 'weight', 'weight', 'kg')
-            elif 'dailyRestingHeartRate' in point:
+            elif collection_type == 'resting_heart_rate':
                 self._process_health_metric(point, 'dailyRestingHeartRate', 'resting_heart_rate', 'bpm')
-            elif 'dailyHeartRateVariability' in point:
+            elif collection_type == 'hrv':
                 self._process_health_metric(point, 'dailyHeartRateVariability', 'hrv_rmssd', 'ms')
-            elif 'respiratoryRateSleepSummary' in point:
+            elif collection_type == 'breathing_rate':
                 self._process_health_metric(point, 'respiratoryRateSleepSummary', 'breathing_rate', 'breaths/min')
-            elif 'heartRate' in point:
-                self._process_health_intraday(point, 'heartRate', 1)  # 1 corresponds to heart_rate
-                
+            elif collection_type == 'intraday_heart_rate':
+                self._process_health_intraday(point, 'heartRate', 1)
+        
         self.db.commit()
 
     def _process_health_metric(self, point: Dict[str, Any], api_key: str, metric_type: str, unit: str):
@@ -459,25 +461,15 @@ class GHealthFetcher:
             
         self.service = build_from_document(json.loads(discovery_doc), credentials=self.credentials)
 
-    def fetch_and_process(self, collection_type: str, start_date: datetime, end_date: datetime, is_webhook: bool = False):
-        """
-        Fetches sessions from the Google Health Rest API for a given date range and processes them.
-        """
-        # Convert dates to RFC3339 timestamps for sleep, and civil patterns for exercise
+    def get_query_params(self, collection_type: str, start_date: datetime, end_date: datetime):
+        """Returns (parent, filter_expr) for the given collection and date range."""
         start_str_rfc = start_date.strftime('%Y-%m-%dT00:00:00.000Z')
         end_str_rfc = end_date.strftime('%Y-%m-%dT23:59:59.999Z')
-        
         start_str_civil = start_date.strftime('%Y-%m-%dT00:00:00')
         end_str_civil = end_date.strftime('%Y-%m-%dT23:59:59')
-
         date_start = start_date.strftime('%Y-%m-%d')
         date_end_plus_1 = (end_date + timedelta(days=1)).strftime('%Y-%m-%d')
 
-        log.info(f"Fetching Google Health {collection_type} data points from {start_str_rfc} to {end_str_rfc}...")
-
-        parent = None
-        filter_expr = None
-        
         if collection_type == 'sleep':
             parent = 'users/me/dataTypes/sleep'
             filter_expr = f'sleep.interval.end_time >= "{start_str_rfc}" AND sleep.interval.end_time < "{end_str_rfc}"'
@@ -500,8 +492,20 @@ class GHealthFetcher:
             parent = 'users/me/dataTypes/heart-rate'
             filter_expr = f'heart_rate.sample_time.physical_time >= "{start_str_rfc}" AND heart_rate.sample_time.physical_time < "{end_str_rfc}"'
         else:
+            return None, None
+
+        return parent, filter_expr
+
+    def fetch_and_process(self, collection_type: str, start_date: datetime, end_date: datetime, is_webhook: bool = False):
+        """
+        Fetches sessions from the Google Health Rest API for a given date range and processes them.
+        """
+        parent, filter_expr = self.get_query_params(collection_type, start_date, end_date)
+        if not parent:
             log.warning(f"No specific handler yet for live sync of collection: {collection_type}")
             return
+
+        log.info(f"Fetching Google Health {collection_type} data points with filter: {filter_expr}")
 
         try:
             points = []
@@ -521,7 +525,7 @@ class GHealthFetcher:
                     break
 
             log.info(f"Retrieved {len(points)} {collection_type} records from Google Health.")
-            self.mapper.process_data_points(points)
+            self.mapper.process_data_points_by_type(collection_type, points)
 
         except Exception as e:
             log.error(f"Error fetching Google Health data: {e}", exc_info=True)
