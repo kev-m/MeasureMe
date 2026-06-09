@@ -27,7 +27,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
     "https://www.googleapis.com/auth/googlehealth.location.readonly",
     "https://www.googleapis.com/auth/googlehealth.nutrition.readonly",
-    "https://www.googleapis.com/auth/googlehealth.sleep.readonly"
+    "https://www.googleapis.com/auth/googlehealth.sleep.readonly",
+    "https://www.googleapis.com/auth/googlehealth.ecg.readonly"
 ]
 
 
@@ -484,20 +485,20 @@ class GHealthFetcher:
             parent = 'users/me/dataTypes/exercise'
             filter_expr = f'exercise.interval.civil_start_time >= "{start_str_civil}" AND exercise.interval.civil_start_time < "{end_str_civil}"'
         elif collection_type == 'hrv':
-            log.warning("Google Health API v4 REST currently does NOT support the Data Type ID: 'dailyHeartRateVariability'. Skipping %s.", collection_type)
-            return
+            parent = 'users/me/dataTypes/daily-heart-rate-variability'
+            filter_expr = f'daily_heart_rate_variability.date >= "{date_start}" AND daily_heart_rate_variability.date < "{date_end_plus_1}"'
         elif collection_type == 'weight':
             parent = 'users/me/dataTypes/weight'
             filter_expr = f'weight.sample_time.physical_time >= "{start_str_rfc}" AND weight.sample_time.physical_time < "{end_str_rfc}"'
         elif collection_type == 'resting_heart_rate':
-            log.warning("Google Health API v4 REST currently does NOT support the Data Type ID: 'dailyRestingHeartRate'. Skipping %s.", collection_type)
-            return
+            parent = 'users/me/dataTypes/daily-resting-heart-rate'
+            filter_expr = f'daily_resting_heart_rate.date >= "{date_start}" AND daily_resting_heart_rate.date < "{date_end_plus_1}"'
         elif collection_type == 'breathing_rate':
-            log.warning("Google Health API v4 REST currently does NOT support the Data Type ID: 'respiratoryRateSleepSummary'. Skipping %s.", collection_type)
-            return
+            parent = 'users/me/dataTypes/respiratory-rate-sleep-summary'
+            filter_expr = f'respiratory_rate_sleep_summary.sample_time.physical_time >= "{start_str_rfc}" AND respiratory_rate_sleep_summary.sample_time.physical_time < "{end_str_rfc}"'
         elif collection_type == 'intraday_heart_rate':
-            log.warning("Google Health API v4 REST currently does NOT support the Data Type ID: 'heartRate'. Skipping %s.", collection_type)
-            return
+            parent = 'users/me/dataTypes/heart-rate'
+            filter_expr = f'heart_rate.sample_time.physical_time >= "{start_str_rfc}" AND heart_rate.sample_time.physical_time < "{end_str_rfc}"'
         else:
             log.warning(f"No specific handler yet for live sync of collection: {collection_type}")
             return

@@ -35,7 +35,7 @@ def login():
         return f"Error: Ensure {CREDENTIALS_FILE} exists from Google Cloud Console.", 400
 
     # Ensure local dev allows insecure transport for oauthlib testing
-    if request.host.startswith('localhost'):
+    if request.host.startswith('localhost') or request.host.startswith('127.0.0.1'):
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
     # Redirect URI is either explicitly configured or built dynamically
@@ -56,6 +56,7 @@ def login():
         prompt='consent'
     )
 
+    session.permanent = True
     session['state'] = state
     session['code_verifier'] = getattr(flow, 'code_verifier', None)
     
@@ -66,10 +67,14 @@ def login():
 @oauth_bp.route('/callback')
 def callback():
     """Handles the callback from Google, extracts tokens, and saves them to disk."""
+    if request.host.startswith('localhost') or request.host.startswith('127.0.0.1'):
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
     state = session.get('state')
     
     if not state:
-        return "Missing session state. Ensure cookies are enabled and try again.", 400
+        logger.error(f"Session state missing. Host: {request.host}, Session: {list(session.keys())}")
+        return "Missing session state. Ensure you are using the SAME host (localhost vs 127.0.0.1) for both login and callback. Ensure cookies are enabled.", 400
 
     if not Path(CREDENTIALS_FILE).exists():
         return f"Error: Ensure {CREDENTIALS_FILE} exists.", 400
