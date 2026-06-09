@@ -34,7 +34,8 @@ SCOPES = [
 BASIC_TYPES = ['sleep', 'exercise', 'weight', 'hrv', 'resting_heart_rate', 'breathing_rate']
 ALL_TYPES = BASIC_TYPES + ['intraday_heart_rate']
 
-def load_credentials(token_path : str) -> Credentials:
+
+def load_credentials(token_path: str) -> Credentials:
     """Loads Google credentials from the local token.json file and refreshes if expired."""
     creds = None
     if Path(token_path).exists():
@@ -42,7 +43,7 @@ def load_credentials(token_path : str) -> Credentials:
             creds = Credentials.from_authorized_user_file(token_path, SCOPES)
         except Exception as e:
             log.error(f"Error loading tokens: {e}")
-            
+
     if creds and creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
@@ -52,8 +53,9 @@ def load_credentials(token_path : str) -> Credentials:
         except Exception as e:
             log.error(f"Error refreshing tokens: {e}")
             creds = None
-            
+
     return creds
+
 
 def extract_global_id(point_name: str) -> int:
     try:
@@ -65,29 +67,31 @@ def extract_global_id(point_name: str) -> int:
 
     return global_id
 
+
 TZ_CACHE = {}
+
 
 def extract_start_end_times(tz_info, interval: Dict[str, Any]) -> tuple[str, datetime, datetime]:
     start_str = interval.get('startTime')
     end_str = interval.get('endTime')
-    
+
     start_offset_str = interval.get('startUtcOffset', '0s')
     end_offset_str = interval.get('endUtcOffset', '0s')
-    
+
     if not start_str or not end_str:
         raise ValueError("No start or end time in %s", interval)
 
     # "2024-03-31T03:00:00Z"
     start_dt_utc = datetime.strptime(start_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z")
     end_dt_utc = datetime.strptime(end_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z")
-    
+
     start_offset_sec = int(start_offset_str.replace('s', ''))
     end_offset_sec = int(end_offset_str.replace('s', ''))
-    
+
     # Embedded naive local time according to the vendor's offset
     emb_start_time = start_dt_utc.replace(tzinfo=None) + timedelta(seconds=start_offset_sec)
     emb_end_time = end_dt_utc.replace(tzinfo=None) + timedelta(seconds=end_offset_sec)
-    
+
     if tz_info:
         start_time = start_dt_utc.astimezone(tz_info).replace(tzinfo=None)
         end_time = end_dt_utc.astimezone(tz_info).replace(tzinfo=None)
@@ -103,7 +107,7 @@ def extract_start_end_times(tz_info, interval: Dict[str, Any]) -> tuple[str, dat
             # available zoneinfo zones for a zone that has the same offset at the
             # start datetime. This is best-effort and may return the first match.
             tz_name_from_offset = None
-            
+
             # try:
             #     from zoneinfo import available_timezones
             #     start_dt_aware = start_dt_utc
@@ -131,14 +135,16 @@ def extract_start_end_times(tz_info, interval: Dict[str, Any]) -> tuple[str, dat
 
     return TZ_CACHE[start_offset_str], start_time, end_time
 
+
 class GHealthDataMapper:
     """Maps Google Health API responses to MeasureMe models."""
+
     def __init__(self, db_session, tz_name: str = "UTC"):
         self.db = db_session
         self.user_id = 1
         self.source_id = 2  # Assuming 2 = Google Health (1 = Fitbit usually)
         self.tz_name = tz_name
-        
+
         # Safely import zoneinfo where required
         try:
             self.tz_info = ZoneInfo(tz_name)
@@ -149,7 +155,8 @@ class GHealthDataMapper:
         """
         Processes data points of a specific type. Useful for directed fetching.
         """
-        for point in data_points:
+        # Google Health API is returned points in reverse time order.
+        for point in reversed(data_points):
             if collection_type == 'sleep':
                 self._process_sleep_session(point)
             elif collection_type == 'exercise':
@@ -164,7 +171,7 @@ class GHealthDataMapper:
                 self._process_health_metric(point, 'respiratoryRateSleepSummary', 'breathing_rate', 'breaths/min')
             elif collection_type == 'intraday_heart_rate':
                 self._process_health_intraday(point, 'heartRate', 1)
-        
+
         self.db.commit()
 
     def _process_health_metric(self, point: Dict[str, Any], api_key: str, metric_type: str, unit: str):
@@ -172,23 +179,19 @@ class GHealthDataMapper:
         if not data:
             return
 
+        # Sometimes used to extract global_id
         point_name = point.get('name', '')
-        if not point_name:
-            return
-
-        global_id = extract_global_id(point_name)
 
         # Get timestamp
         timestamp = None
         if 'date' in data:
             # e.g., "2024-03-31" or similar
-            date_str = data['date'].get('year') and f"{data['date']['year']}-{data['date']['month']:02d}-{data['date']['day']:02d}"
-            if not date_str:
-                return
-            try:
-                timestamp = datetime.strptime(date_str, "%Y-%m-%d")
-            except ValueError:
-                pass
+            date_obj = data['date']
+            if date_obj.get('year') and date_obj.get('month') and date_obj.get('day'):
+                try:
+                    timestamp = datetime(date_obj['year'], date_obj['month'], date_obj['day'])
+                except ValueError:
+                    pass
         elif 'sampleTime' in data:
             # e.g., "2024-03-31T03:00:00Z"
             time_obj = data['sampleTime']
@@ -196,39 +199,76 @@ class GHealthDataMapper:
                 time_str = time_obj.get('physicalTime') or time_obj.get('logicalTime') or ''
             else:
                 time_str = str(time_obj)
-                
+
             if time_str:
                 try:
-                    if '.' in time_str:
-                        timestamp = datetime.strptime(time_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S.%f%z").replace(tzinfo=None)
+                    # Google API sometimes returns sub-second precision that strptime doesn't like if too long
+                    # or missing Z. We'll handle Z and then try basic parsing.
+                    clean_time = time_str.replace("Z", "+0000")
+                    if '.' in clean_time:
+                        # Truncate fractional seconds to 6 digits (microseconds)
+                        parts = clean_time.split('.')
+                        time_part = parts[0]
+                        frac_part = parts[1][:6] if '+' not in parts[1] else parts[1].split('+')[0][:6]
+                        tz_part = parts[1].split('+')[1] if '+' in parts[1] else '0000'
+                        clean_time = f"{time_part}.{frac_part}+{tz_part}"
+                        timestamp = datetime.strptime(clean_time, "%Y-%m-%dT%H:%M:%S.%f%z").replace(tzinfo=None)
                     else:
-                        timestamp = datetime.strptime(time_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z").replace(tzinfo=None)
-                except ValueError:
-                    pass
+                        timestamp = datetime.strptime(clean_time, "%Y-%m-%dT%H:%M:%S%z").replace(tzinfo=None)
+                except Exception:
+                    log.warning(f"Failed to parse time string: {time_str}")
 
         if not timestamp:
             return
 
+        # Default global_id for non-identified types is the timestamp.
+        # Identified types override the global_id on an individual basis.
+        # NOTE: This only works in this context because the credentials are for a single user,
+        #       so that all data in this database is for *this* user.
+        # TODO: At some point in the future, will need a more generic global_id from time algorithm.
+        #       Probably one that takes some kind of inject "this user id prefix" that offsets the timestamp?
+        global_id = int(timestamp.timestamp() * 1000)
+        # Have to do a correction, as all daily metrics have the same timestamp
+        global_id += len(metric_type)
+
         # Get value
         value = None
         if api_key == 'weight':
+            if not point_name:
+                log.warning("Point name not found for metric '%s'", metric_type)
+                return
+            global_id = extract_global_id(point_name)
             weight_grams = data.get('weightGrams')
             if weight_grams:
                 value = weight_grams / 1000.0
         elif api_key == 'dailyRestingHeartRate':
-            value = float(data.get('beatsPerMinute', 0))
+            # beatsPerMinute is often a string in the API
+            bpm = data.get('beatsPerMinute')
+            if bpm is not None:
+                value = round(float(bpm), 1)
         elif api_key == 'dailyHeartRateVariability':
-            value = float(data.get('averageHeartRateVariabilityMilliseconds', 0))
+            hrv = data.get('averageHeartRateVariabilityMilliseconds')
+            if hrv is not None:
+                value = round(float(hrv), 1)
         elif api_key == 'respiratoryRateSleepSummary':
             stats = data.get('fullSleepStats', {})
-            value = float(stats.get('breathsPerMinute', 0))
+            br = stats.get('breathsPerMinute')
+            if br is not None:
+                value = round(float(br), 1)
 
-        if not value:
+        if value is None:
             return
 
         existing = self.db.query(HealthMetric).filter(HealthMetric.global_id == global_id).first()
         if not existing:
-            metric_record = HealthMetric(global_id=global_id, user_id=self.user_id, source_id=self.source_id, metric_type=metric_type, value=value, unit=unit, timestamp=timestamp, timezone=self.tz_name)
+            metric_record = HealthMetric(global_id=global_id,
+                                         user_id=self.user_id,
+                                         source_id=self.source_id,
+                                         metric_type=metric_type,
+                                         value=value,
+                                         unit=unit,
+                                         timestamp=timestamp,
+                                         timezone=self.tz_name)
             self.db.add(metric_record)
         else:
             existing.value = value
@@ -243,8 +283,12 @@ class GHealthDataMapper:
 
         time_obj = data.get('sampleTime')
         if not time_obj:
+            # Check point-level startTime (used in aggregate/rollUp results)
+            time_obj = point.get('startTime')
+
+        if not time_obj:
             return
-        
+
         if isinstance(time_obj, dict):
             time_str = time_obj.get('physicalTime') or time_obj.get('logicalTime') or ''
         else:
@@ -254,25 +298,57 @@ class GHealthDataMapper:
             return
 
         try:
+            # Truncate fractional seconds to 6 digits (microseconds) if necessary for strptime %f
             if '.' in time_str:
-                timestamp_utc = int(datetime.strptime(time_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S.%f%z").timestamp())
+                parts = time_str.split('.')
+                if len(parts) > 1:
+                    # Keep only up to 6 digits of fractional seconds before 'Z' or '+'
+                    suffix = ""
+                    if "Z" in parts[1]:
+                        suffix = "Z"
+                        frac = parts[1].split("Z")[0]
+                    elif "+" in parts[1]:
+                        suffix = "+" + parts[1].split("+")[1]
+                        frac = parts[1].split("+")[0]
+                    else:
+                        frac = parts[1]
+
+                    time_str = parts[0] + "." + frac[:6] + suffix
+
+            if '.' in time_str:
+                timestamp_utc = int(
+                    datetime.strptime(time_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S.%f%z").timestamp())
             else:
-                timestamp_utc = int(datetime.strptime(time_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z").timestamp())
+                timestamp_utc = int(
+                    datetime.strptime(time_str.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z").timestamp())
         except ValueError:
             return
 
         value = None
         if api_key == 'heartRate':
-            value = float(data.get('beatsPerMinute', 0))
+            # Raw bpm
+            bpm = data.get('beatsPerMinute')
+            if bpm is None:
+                # Rollup average
+                bpm = data.get('beatsPerMinuteAvg')
+
+            if bpm is not None:
+                # Round to integer
+                value = round(float(bpm), 0)
 
         if not value:
             return
 
         # Intraday uses (timestamp_utc, user_id, metric_type_id) as PK
-        existing = self.db.query(HealthIntraday).filter(HealthIntraday.timestamp_utc == timestamp_utc, HealthIntraday.user_id == self.user_id, HealthIntraday.metric_type_id == metric_type_id).first()
+        existing = self.db.query(HealthIntraday).filter(HealthIntraday.timestamp_utc == timestamp_utc,
+                                                        HealthIntraday.user_id == self.user_id,
+                                                        HealthIntraday.metric_type_id == metric_type_id).first()
 
         if not existing:
-            intraday_record = HealthIntraday(timestamp_utc=timestamp_utc, user_id=self.user_id, metric_type_id=metric_type_id, value=value)
+            intraday_record = HealthIntraday(timestamp_utc=timestamp_utc,
+                                             user_id=self.user_id,
+                                             metric_type_id=metric_type_id,
+                                             value=value)
             self.db.add(intraday_record)
         else:
             existing.value = value
@@ -316,19 +392,10 @@ class GHealthDataMapper:
     def _process_sleep_session(self, point: Dict[str, Any]):
         # ID can come from point name: e.g. "users/me/dataTypes/sleep/dataPoints/12345"
         point_name = point.get('name', '')
-        if not point_name:
-            return
-        
-        global_id = extract_global_id(point_name)            
-        entry = point.get('sleep', {})
 
+        entry = point.get('sleep', {})
         # Data clean-up, remove excessive details: stages
         entry.pop('stages', None)
-
-        ## log.debug("Sleep data: %s", entry)
-
-        ## Debugging
-        ## print(json.dumps(entry, indent=2, ensure_ascii=False))        
 
         interval = entry.get('interval', {})
         try:
@@ -336,14 +403,17 @@ class GHealthDataMapper:
         except ValueError:
             return
 
+        if not point_name:
+            # Fallback for types that don't have a unique 'name' resource path
+            point_name = f"ghealth_sleep_{start_time.strftime('%Y%m%d%H%M%S')}"
+
+        global_id = extract_global_id(point_name)
+
         metadata = json.dumps(entry)
         summary = entry.get('summary', {})
         levels_summary = summary.get('stagesSummary', {})
 
         duration_minutes = int(summary.get('minutesAsleep', 0))
-
-        # efficiency is not automatically calculated
-        # efficiency = 
 
         # Upsert logic
         existing = self.db.query(SleepSession).filter(SleepSession.global_id == global_id).first()
@@ -364,8 +434,7 @@ class GHealthDataMapper:
                 light_sleep_minutes=self.extract_sleep_summary(levels_summary, 'LIGHT'),
                 rem_sleep_minutes=self.extract_sleep_summary(levels_summary, 'REM'),
                 awake_minutes=self.extract_sleep_summary(levels_summary, 'AWAKE'),
-                time_in_bed_minutes=int(summary.get('minutesInSleepPeriod', 0))*60
-            )
+                time_in_bed_minutes=int(summary.get('minutesInSleepPeriod', 0)))
             self.db.add(sleep_record)
         else:
             existing.start_time = start_time
@@ -379,21 +448,12 @@ class GHealthDataMapper:
             existing.light_sleep_minutes = self.extract_sleep_summary(levels_summary, 'LIGHT')
             existing.rem_sleep_minutes = self.extract_sleep_summary(levels_summary, 'REM')
             existing.awake_minutes = self.extract_sleep_summary(levels_summary, 'AWAKE')
-            existing.time_in_bed_minutes = int(summary.get('minutesInSleepPeriod', 0))*60
+            existing.time_in_bed_minutes = int(summary.get('minutesInSleepPeriod', 0))
 
     def _process_exercise_session(self, point: Dict[str, Any]):
 
         point_name = point.get('name', '')
-        if not point_name:
-            return
-
-        global_id = extract_global_id(point_name)    
-
         entry = point.get('exercise', {})
-        interval = entry.get('interval', {})
-        
-        ## Debugging
-        ## print(json.dumps(entry, indent=2, ensure_ascii=False))        
 
         interval = entry.get('interval', {})
         try:
@@ -401,9 +461,11 @@ class GHealthDataMapper:
         except ValueError:
             return
 
+        global_id = extract_global_id(point_name)
+
         duration_seconds = int((end_time - start_time).total_seconds())
         metadata = json.dumps(entry)
-        
+
         activity_type = entry.get('exerciseType', 'UNKNOWN')
         activity_name = entry.get('displayName', activity_type)
 
@@ -413,21 +475,20 @@ class GHealthDataMapper:
         # Upsert logic
         existing = self.db.query(ExerciseSession).filter(ExerciseSession.global_id == global_id).first()
         if not existing:
-            exercise_record = ExerciseSession(
-                global_id=global_id,
-                user_id=self.user_id,
-                source_id=self.source_id,
-                start_time=start_time,
-                end_time=end_time,
-                duration_seconds=duration_seconds,
-                activity_name=activity_name[:100],
-                timezone=tz_name,
-                metadata_json=metadata,
-                steps=int(metrics_summary.get('steps', 0)),
-                calories_burned=float(metrics_summary.get('caloriesKcal', 0)),
-                distance_km=float(metrics_summary.get('distanceMillimeters', 0))/1000,
-                average_heart_rate=int(metrics_summary.get('averageHeartRateBeatsPerMinute', 0))
-            )
+            exercise_record = ExerciseSession(global_id=global_id,
+                                              user_id=self.user_id,
+                                              source_id=self.source_id,
+                                              start_time=start_time,
+                                              end_time=end_time,
+                                              duration_seconds=duration_seconds,
+                                              activity_name=activity_name[:100],
+                                              timezone=tz_name,
+                                              metadata_json=metadata,
+                                              steps=int(metrics_summary.get('steps', 0)),
+                                              calories_burned=float(metrics_summary.get('caloriesKcal', 0)),
+                                              distance_km=float(metrics_summary.get('distanceMillimeters', 0)) / 1000,
+                                              average_heart_rate=int(
+                                                  metrics_summary.get('averageHeartRateBeatsPerMinute', 0)))
             self.db.add(exercise_record)
         else:
             existing.start_time = start_time
@@ -438,7 +499,7 @@ class GHealthDataMapper:
             existing.timezone = tz_name
             existing.steps = int(metrics_summary.get('steps', 0))
             existing.calories_burned = float(metrics_summary.get('caloriesKcal', 0))
-            existing.distance_km = float(metrics_summary.get('distanceMillimeters', 0))/1000
+            existing.distance_km = float(metrics_summary.get('distanceMillimeters', 0)) / 1000
             existing.average_heart_rate = int(metrics_summary.get('averageHeartRateBeatsPerMinute', 0))
 
 
@@ -447,18 +508,19 @@ class GHealthFetcher:
     Encapsulates fetching Google Health data using the googleapiclient
     and delegating data mapping to GHealthDataMapper.
     """
+
     def __init__(self, credentials: Credentials, mapper: GHealthDataMapper):
-        
+
         if not credentials or not credentials.valid:
             raise ValueError("Valid Google credentials are required to initialize GHealthFetcher.")
         self.credentials = credentials
         self.mapper = mapper
-        
+
         # Build the official Google Health API resource directly from the discovery rest document
         discovery_path = os.path.join(os.path.dirname(__file__), 'health_api_discovery_rest.json')
         with open(discovery_path, 'r', encoding='utf-8') as f:
             discovery_doc = f.read()
-            
+
         self.service = build_from_document(json.loads(discovery_doc), credentials=self.credentials)
 
     def get_query_params(self, collection_type: str, start_date: datetime, end_date: datetime):
@@ -496,37 +558,71 @@ class GHealthFetcher:
 
         return parent, filter_expr
 
-    def fetch_and_process(self, collection_type: str, start_date: datetime, end_date: datetime, is_webhook: bool = False):
+    def fetch_and_process(self,
+                          collection_type: str,
+                          start_date: datetime,
+                          end_date: datetime,
+                          is_webhook: bool = False):
         """
         Fetches sessions from the Google Health Rest API for a given date range and processes them.
         """
+        if collection_type == 'intraday_heart_rate':
+            # rollUp has a 14-day limit for heart-rate
+            max_days = 14
+            current_start = start_date
+            while current_start <= end_date:
+                current_end = min(current_start + timedelta(days=max_days), end_date)
+                self._fetch_and_process_chunk(collection_type, current_start, current_end)
+                current_start = current_end
+                if current_start == end_date:
+                    break
+        else:
+            self._fetch_and_process_chunk(collection_type, start_date, end_date)
+
+    def _fetch_and_process_chunk(self, collection_type: str, start_date: datetime, end_date: datetime):
         parent, filter_expr = self.get_query_params(collection_type, start_date, end_date)
         if not parent:
             log.warning(f"No specific handler yet for live sync of collection: {collection_type}")
             return
 
-        log.info(f"Fetching Google Health {collection_type} data points with filter: {filter_expr}")
+        # Prepare strings for rollUp range if needed
+        start_str_rfc = start_date.strftime('%Y-%m-%dT00:00:00.000Z')
+        end_str_rfc = end_date.strftime('%Y-%m-%dT23:59:59.999Z')
+
+        log.info(f"Fetching Google Health {collection_type} from {start_date} to {end_date}")
 
         try:
             points = []
             page_token = None
             while True:
-                # Default pageSize for dataPoints is 1440, but max is 10000 
+                # Default pageSize for dataPoints is 1440, but max is 10000
                 # except for exercise/sleep which is capped at 25.
                 page_size = 10000
                 if collection_type in ['exercise', 'sleep']:
                     page_size = 25
 
-                response = self.service.users().dataTypes().dataPoints().list(
-                    parent=parent,
-                    filter=filter_expr,
-                    pageToken=page_token,
-                    pageSize=page_size
-                ).execute()
-                
-                new_points = response.get('dataPoints', [])
+                if collection_type == 'intraday_heart_rate':
+                    # Use rollUp for 1 minute resolution instead of 1 second raw points
+                    body = {
+                        "windowSize": "60s",
+                        "range": {
+                            "startTime": start_str_rfc,
+                            "endTime": end_str_rfc
+                        },
+                        "pageSize": page_size,
+                        "pageToken": page_token
+                    }
+                    response = self.service.users().dataTypes().dataPoints().rollUp(parent=parent, body=body).execute()
+                    new_points = response.get('rollupDataPoints', [])
+                else:
+                    response = self.service.users().dataTypes().dataPoints().list(parent=parent,
+                                                                                  filter=filter_expr,
+                                                                                  pageToken=page_token,
+                                                                                  pageSize=page_size).execute()
+                    new_points = response.get('dataPoints', [])
+
                 points.extend(new_points)
-                
+
                 page_token = response.get('nextPageToken')
                 if not page_token:
                     break
@@ -535,5 +631,5 @@ class GHealthFetcher:
             self.mapper.process_data_points_by_type(collection_type, points)
 
         except Exception as e:
-            log.error(f"Error fetching Google Health data: {e}", exc_info=True)
+            log.error(f"Error fetching Google Health data chunk {collection_type}: {e}", exc_info=True)
             raise
