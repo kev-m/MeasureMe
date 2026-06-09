@@ -511,10 +511,17 @@ class GHealthFetcher:
             points = []
             page_token = None
             while True:
+                # Default pageSize for dataPoints is 1440, but max is 10000 
+                # except for exercise/sleep which is capped at 25.
+                page_size = 10000
+                if collection_type in ['exercise', 'sleep']:
+                    page_size = 25
+
                 response = self.service.users().dataTypes().dataPoints().list(
                     parent=parent,
                     filter=filter_expr,
-                    pageToken=page_token
+                    pageToken=page_token,
+                    pageSize=page_size
                 ).execute()
                 
                 new_points = response.get('dataPoints', [])
