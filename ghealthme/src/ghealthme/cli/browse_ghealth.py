@@ -152,7 +152,7 @@ def main():
     parser = argparse.ArgumentParser(description="Browse Google Health API data as CSV.")
     parser.add_argument('--start', type=str, required=True, help='Start date YYYY-MM-DD')
     parser.add_argument('--end', type=str, required=True, help='End date YYYY-MM-DD')
-    parser.add_argument('--types', nargs='+', help=f'Collections to browse {ALL_TYPES}')
+    parser.add_argument('--types', nargs='+', help=f"Collections to browse: {' '.join(ALL_TYPES)}, default is: {' '.join(BASIC_TYPES)}")
     parser.add_argument('--timezone', type=str, default="Europe/London", help='IANA timezone for local times.')
 
     args = parser.parse_args()

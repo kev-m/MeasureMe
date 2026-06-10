@@ -179,9 +179,6 @@ class GHealthDataMapper:
         if not data:
             return
 
-        # Sometimes used to extract global_id
-        point_name = point.get('name', '')
-
         # Get timestamp
         timestamp = None
         if 'date' in data:
@@ -234,6 +231,7 @@ class GHealthDataMapper:
         # Get value
         value = None
         if api_key == 'weight':
+            point_name = point.get('name', '')
             if not point_name:
                 log.warning("Point name not found for metric '%s'", metric_type)
                 return
